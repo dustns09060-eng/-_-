@@ -3,112 +3,123 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#ff6b00" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="application-name" content="여우방 맞팔확인" />
   <meta name="apple-mobile-web-app-title" content="여우방 맞팔확인" />
   <meta name="description" content="단톡방 명단 기준 인스타그램 맞팔 확인" />
   <meta property="og:title" content="여우방 맞팔확인" />
   <meta property="og:description" content="단톡방에 있는 사람만 간단하게 맞팔 확인" />
-  <meta property="og:image" content="icon.svg" />
+  <meta property="og:image" content="icon-512.png" />
   <title>여우방 맞팔확인</title>
-  <link rel="manifest" href="manifest.json?v=15" />
-  <link rel="icon" href="icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="style.css?v=15" />
+  <link rel="manifest" href="manifest.json?v=16" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="style.css?v=16" />
 </head>
 <body>
   <header class="header">
     <div class="brand">
-      <img class="brand-icon" src="icon.svg" alt="여우방" />
-      <div>
-        <div class="brand-line">
-          <h1>여우방 맞팔확인</h1>
-          <span class="version">V15 SIMPLE</span>
-        </div>
-        <p>단톡방 명단 기준으로만 확인해요</p>
-      </div>
+      <span class="brand-symbol" aria-hidden="true">
+        <svg viewBox="0 0 48 48"><circle cx="18" cy="17" r="6"/><circle cx="31" cy="16" r="5"/><path d="M7 38c0-8 5-13 11-13s11 5 11 13M25 37c0-7 4-11 9-11s8 4 8 11"/></svg>
+      </span>
+      <h1>여우방 맞팔확인</h1>
+      <span class="version">V16 SIMPLE</span>
     </div>
-    <button id="installBtn" class="install" type="button">앱설치</button>
+    <button id="installBtn" class="install" type="button" aria-label="앱 설치">⚙ 앱설치</button>
   </header>
 
   <main class="container">
-    <section class="card upload-card">
-      <div class="section-head">
-        <div>
-          <h2>1. 인스타그램 ZIP 업로드</h2>
-          <p>followers_*.html 또는 JSON, following.html 또는 JSON이 포함된 ZIP 파일을 선택하세요.</p>
+    <section class="card start-card">
+      <div class="room-row">
+        <div class="room-info">
+          <span>단톡방 명단</span>
+          <strong id="roomState">불러오는 중</strong>
         </div>
+        <button id="reloadRoomBtn" class="outline small" type="button">↻ 새로고침</button>
       </div>
 
-      <label class="dropzone" for="zipFile">
-        <span class="upload-icon">⇧</span>
-        <strong id="fileName">ZIP 파일 선택</strong>
-        <small>눌러서 파일을 선택해 주세요</small>
+      <label class="file-input" for="zipFile">
+        <span id="fileName">인스타그램 ZIP 파일 선택</span>
         <input id="zipFile" type="file" accept=".zip,application/zip" />
       </label>
 
-      <div class="room-state">
-        <span>단톡방 명단</span>
-        <strong id="roomState">불러오는 중</strong>
-        <button id="reloadRoomBtn" type="button">새로고침</button>
-      </div>
-
-      <button id="analyzeBtn" class="primary" type="button">맞팔 분석 시작 →</button>
-      <p id="status" class="status">명단을 불러온 뒤 ZIP 파일을 선택해 주세요.</p>
+      <button id="analyzeBtn" class="primary" type="button">맞팔 분석 시작 <span>→</span></button>
+      <p id="status" class="status">단톡방 명단을 불러온 뒤 ZIP 파일을 선택해 주세요.</p>
     </section>
 
     <section id="summarySection" class="card hidden">
       <div class="section-title-row">
         <h2>분석 결과 요약</h2>
-        <button id="resetBtn" class="outline" type="button">새로 분석</button>
+        <button id="resetBtn" class="outline small" type="button">↻ 새로 분석</button>
       </div>
 
       <div class="summary-grid">
         <article class="summary-box green">
+          <span class="summary-icon">✓</span>
           <span>맞팔 완료</span>
           <strong id="mutualCount">0명</strong>
+          <small id="mutualRate">0%</small>
         </article>
         <article class="summary-box orange">
-          <span>내가 팔로우만 함</span>
+          <span class="summary-icon">♙</span>
+          <span>나만 팔로우 함</span>
           <strong id="onlyMeCount">0명</strong>
+          <small id="onlyMeRate">0%</small>
         </article>
-        <article class="summary-box red">
+        <article class="summary-box blue">
+          <span class="summary-icon">♙</span>
           <span>상대가 팔로우만 함</span>
           <strong id="fansOnlyCount">0명</strong>
+          <small id="fansOnlyRate">0%</small>
         </article>
         <article class="summary-box gray">
+          <span class="summary-icon">♙</span>
           <span>서로 팔로우 안 함</span>
           <strong id="neitherCount">0명</strong>
+          <small id="neitherRate">0%</small>
         </article>
       </div>
       <p id="rateText" class="rate"></p>
     </section>
 
     <section id="resultsSection" class="card hidden">
-      <div class="tabs" role="tablist">
-        <button class="tab active" data-tab="all" type="button">전체 <span id="tabAll">0</span></button>
-        <button class="tab" data-tab="mutual" type="button">맞팔 <span id="tabMutual">0</span></button>
-        <button class="tab" data-tab="onlyMe" type="button">내가만 <span id="tabOnlyMe">0</span></button>
-        <button class="tab" data-tab="fansOnly" type="button">상대만 <span id="tabFansOnly">0</span></button>
-        <button class="tab" data-tab="neither" type="button">서로 안 함 <span id="tabNeither">0</span></button>
+      <div class="tools">
+        <div class="search-wrap">
+          <span>⌕</span>
+          <input id="searchInput" type="search" placeholder="아이디 또는 닉네임 검색" autocomplete="off" />
+        </div>
+        <button id="copyBtn" class="outline" type="button">▣ 미맞팔 명단 복사</button>
+        <button id="csvBtn" class="outline" type="button">⇩ CSV 다운로드</button>
       </div>
 
-      <div class="tools">
-        <input id="searchInput" type="search" placeholder="아이디 또는 닉네임 검색" autocomplete="off" />
-        <button id="copyBtn" class="outline" type="button">현재 명단 복사</button>
-        <button id="csvBtn" class="outline" type="button">CSV 다운로드</button>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="all" type="button">전체 (<span id="tabAll">0</span>)</button>
+        <button class="tab" data-tab="mutual" type="button">맞팔 완료 (<span id="tabMutual">0</span>)</button>
+        <button class="tab" data-tab="onlyMe" type="button">나만 팔로우 함 (<span id="tabOnlyMe">0</span>)</button>
+        <button class="tab" data-tab="fansOnly" type="button">상대가 팔로우만 함 (<span id="tabFansOnly">0</span>)</button>
+        <button class="tab" data-tab="neither" type="button">서로 팔로우 안 함 (<span id="tabNeither">0</span>)</button>
       </div>
 
       <div class="table-head">
         <span>번호</span><span>닉네임</span><span>아이디</span><span>상태</span><span>바로가기</span>
       </div>
-      <div id="list" class="list"></div>
+      <div id="list" class="list">
+        <div class="empty-state">
+          <span class="empty-icon">▣</span>
+          <strong>분석을 시작해주세요.</strong>
+          <p>ZIP 파일을 업로드하고 맞팔 분석을 시작하세요.</p>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer>© 여우방 맞팔확인</footer>
+  <footer>
+    <span>© 2026 YEOWOOBANG</span>
+    <span>Version 1.0.0</span>
+  </footer>
   <div id="toast" class="toast" role="status"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

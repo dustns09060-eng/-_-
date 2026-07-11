@@ -132,15 +132,18 @@ async function analyze(){
     $("status").textContent=`분석 완료 · 단톡방 ${roomList.length}명 기준`;
     toast("분석 완료");
   }catch(e){$("status").textContent=`오류: ${e.message}`;toast("분석 실패")}
-  finally{btn.disabled=false;btn.textContent="맞팔 분석 시작 →"}
+  finally{btn.disabled=false;btn.innerHTML='맞팔 분석 시작 <span>→</span>'}
 }
+function pct(n,total){return total?`${((n/total)*100).toFixed(1)}%`:"0%"}
 function updateSummary(){
+  const total=result.all.length;
   $("mutualCount").textContent=`${result.mutual.length}명`;$("onlyMeCount").textContent=`${result.onlyMe.length}명`;$("fansOnlyCount").textContent=`${result.fansOnly.length}명`;$("neitherCount").textContent=`${result.neither.length}명`;
+  $("mutualRate").textContent=pct(result.mutual.length,total);$("onlyMeRate").textContent=pct(result.onlyMe.length,total);$("fansOnlyRate").textContent=pct(result.fansOnly.length,total);$("neitherRate").textContent=pct(result.neither.length,total);
   $("tabAll").textContent=result.all.length;$("tabMutual").textContent=result.mutual.length;$("tabOnlyMe").textContent=result.onlyMe.length;$("tabFansOnly").textContent=result.fansOnly.length;$("tabNeither").textContent=result.neither.length;
-  const rate=result.all.length?((result.mutual.length/result.all.length)*100).toFixed(1):"0.0";
-  $("rateText").textContent=`단톡방 맞팔률 ${rate}% · ${result.mutual.length}/${result.all.length}명`;
+  const rate=total?((result.mutual.length/total)*100).toFixed(1):"0.0";
+  $("rateText").innerHTML=`단톡방 맞팔률 <strong>${rate}%</strong> · ${result.mutual.length}/${total}명`;
 }
-function label(status){return {mutual:"맞팔 완료",onlyMe:"내가 팔로우만 함",fansOnly:"상대가 팔로우만 함",neither:"서로 팔로우 안 함"}[status]}
+function label(status){return {mutual:"맞팔 완료",onlyMe:"나만 팔로우 함",fansOnly:"상대가 팔로우만 함",neither:"서로 팔로우 안 함"}[status]}
 function showTab(tab){currentTab=tab;document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));renderList()}
 function filtered(){
   const q=String($("searchInput").value||"").trim().toLowerCase(); const list=result[currentTab]||[];
@@ -148,13 +151,14 @@ function filtered(){
 }
 function renderList(){
   const items=filtered();
-  $("list").innerHTML=items.length?items.map((x,i)=>`<div class="item"><span>${i+1}</span><span class="name">${escapeHtml(x.name||"")}</span><a class="id" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener noreferrer">@${escapeHtml(x.id)}</a><span class="badge ${x.status}">${label(x.status)}</span><a class="insta" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener noreferrer">인스타</a></div>`).join(""):"<div class='empty'>해당 결과가 없습니다.</div>";
+  $("list").innerHTML=items.length?items.map((x,i)=>`<div class="item"><span class="no">${i+1}</span><span class="name">${escapeHtml(x.name||"")}</span><a class="id" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener noreferrer">@${escapeHtml(x.id)}</a><span class="badge ${x.status}">${label(x.status)}</span><a class="insta" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener noreferrer">인스타</a></div>`).join(""):'<div class="empty-state"><span class="empty-icon">▣</span><strong>해당 결과가 없습니다.</strong><p>다른 탭이나 검색어를 확인해 주세요.</p></div>';
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 async function copyCurrent(){
-  const items=filtered(); if(!items.length)return toast("복사할 명단이 없습니다.");
+  let items=currentTab==="all"?[...result.onlyMe,...result.neither]:filtered();
+  if(!items.length)return toast("복사할 미맞팔 명단이 없습니다.");
   const text=items.map((x,i)=>`${i+1}. ${x.name||""} @${x.id} - ${label(x.status)}`).join("\n");
-  try{await navigator.clipboard.writeText(text);toast("복사 완료")}catch{toast("복사를 지원하지 않는 브라우저입니다.")}
+  try{await navigator.clipboard.writeText(text);toast("미맞팔 명단 복사 완료")}catch{toast("복사를 지원하지 않는 브라우저입니다.")}
 }
 function downloadCsv(){
   const items=filtered(); if(!items.length)return toast("다운로드할 명단이 없습니다.");
@@ -163,10 +167,10 @@ function downloadCsv(){
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`여우방_${currentTab}_명단.csv`;a.click();URL.revokeObjectURL(url);
 }
 function reset(){
-  $("zipFile").value="";$("fileName").textContent="ZIP 파일 선택";$("summarySection").classList.add("hidden");$("resultsSection").classList.add("hidden");$("status").textContent="ZIP 파일을 선택하고 분석을 시작하세요.";result={all:[],mutual:[],onlyMe:[],fansOnly:[],neither:[]};window.scrollTo({top:0,behavior:"smooth"});
+  $("zipFile").value="";$("fileName").textContent="인스타그램 ZIP 파일 선택";$("summarySection").classList.add("hidden");$("resultsSection").classList.add("hidden");$("status").textContent="ZIP 파일을 선택하고 분석을 시작하세요.";result={all:[],mutual:[],onlyMe:[],fansOnly:[],neither:[]};window.scrollTo({top:0,behavior:"smooth"});
 }
-$("zipFile").addEventListener("change",()=>{$("fileName").textContent=$("zipFile").files[0]?.name||"ZIP 파일 선택"});
+$("zipFile").addEventListener("change",()=>{$("fileName").textContent=$("zipFile").files[0]?.name||"인스타그램 ZIP 파일 선택"});
 $("analyzeBtn").addEventListener("click",analyze);$("reloadRoomBtn").addEventListener("click",()=>loadRoomList(true));$("resetBtn").addEventListener("click",reset);$("searchInput").addEventListener("input",renderList);$("copyBtn").addEventListener("click",copyCurrent);$("csvBtn").addEventListener("click",downloadCsv);document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installPrompt=e});
 $("installBtn").addEventListener("click",async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else toast("브라우저 메뉴에서 홈 화면에 추가를 눌러주세요.")});
-window.addEventListener("DOMContentLoaded",async()=>{await loadConfig();await loadRoomList(false)});
+window.addEventListener("DOMContentLoaded",async()=>{await loadConfig();await loadRoomList(false);if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js?v=16").catch(()=>{})});
