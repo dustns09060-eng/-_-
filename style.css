@@ -58,3 +58,51 @@ body{padding-bottom:env(safe-area-inset-bottom)}
   .container{padding-bottom:112px}
   footer{padding-bottom:96px}
 }
+
+
+/* V18.1 맞팔확인 잠금 설정 */
+.lock-card{
+  text-align:center;
+  padding:42px 20px;
+}
+.lock-icon{
+  font-size:46px;
+  margin-bottom:10px;
+}
+.lock-card h2{
+  margin:0 0 10px;
+}
+.lock-card p{
+  margin:5px 0;
+}
+.lock-state{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:84px;
+  padding:8px 12px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:900;
+}
+.lock-state.unlocked{
+  background:#eaf8ef;
+  color:#14864b;
+}
+.lock-state.locked{
+  background:#fff0f0;
+  color:#d33c3c;
+}
+.danger-outline{
+  border-color:#efb2b2 !important;
+  color:#d53b3b !important;
+}
+.success-outline{
+  border-color:#a9dbbd !important;
+  color:#16864b !important;
+}
+@media(max-width:520px){
+  .admin-actions{
+    grid-template-columns:1fr !important;
+  }
+}

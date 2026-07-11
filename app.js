@@ -1,4 +1,4 @@
-const $=id=>document.getElementById(id);let roomList=[],result={all:[],mutual:[],onlyMe:[],fansOnly:[],neither:[]},currentTab="all",currentGroup=0,installPrompt=null,adminLoggedIn=false;let config={sheetId:"",sheetName:"Sheet1",fallbackCsv:"room-list.csv",adminPassword:"0702"};
+const $=id=>document.getElementById(id);let roomList=[],result={all:[],mutual:[],onlyMe:[],fansOnly:[],neither:[]},currentTab="all",currentGroup=0,installPrompt=null,adminLoggedIn=false,matchLocked=false;let config={sheetId:"",sheetName:"Sheet1",fallbackCsv:"room-list.csv",adminPassword:"0702"};
 function toast(m){const e=$("toast");e.textContent=m;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",1800)}
 function normalize(v){return String(v||"").trim().toLowerCase().replace(/^https?:\/\/(www\.)?instagram\.com\//,"").replace(/^instagram\.com\//,"").replace(/^_u\//,"").replace(/^@+/,"").replace(/[?#].*$/,"").replace(/\/+$/,"").trim()}
 function validUsername(v){return /^[a-z0-9._]{1,30}$/.test(v)&&!["instagram","accounts","explore","direct","p","reels","stories","www","about","privacy","terms","login","_u"].includes(v)}
@@ -20,7 +20,7 @@ function walkJson(v,o){if(v==null)return;if(typeof v==='string'){const id=normal
 function extractJson(t){const o=[];try{walkJson(JSON.parse(t),o)}catch{}return unique(o)}
 async function parseInstagramZip(file){if(!file)throw Error("ZIP 파일을 선택해 주세요.");if(!window.JSZip)throw Error("ZIP 분석 라이브러리를 불러오지 못했습니다.");const z=await JSZip.loadAsync(file),p=findFiles(z);if(!p.followers.length)throw Error("followers_1 파일을 찾지 못했습니다.");if(!p.following)throw Error("following 파일을 찾지 못했습니다.");let followers=[];for(const path of p.followers){const t=await z.files[path].async("string");followers.push(...(path.endsWith('.json')?extractJson(t):extractHtml(t)))}const gt=await z.files[p.following].async("string"),following=p.following.endsWith('.json')?extractJson(gt):extractHtml(gt);return{followers:unique(followers),following}}
 function classify(followers,following){const F=new Set(followers),G=new Set(following),all=roomList.map(p=>({...p,status:F.has(p.id)&&G.has(p.id)?'mutual':!F.has(p.id)&&G.has(p.id)?'onlyMe':F.has(p.id)&&!G.has(p.id)?'fansOnly':'neither'}));result={all,mutual:all.filter(x=>x.status==='mutual'),onlyMe:all.filter(x=>x.status==='onlyMe'),fansOnly:all.filter(x=>x.status==='fansOnly'),neither:all.filter(x=>x.status==='neither')}}
-async function analyze(){const b=$("analyzeBtn");try{b.disabled=true;b.textContent="분석 중...";if(!roomList.length)await loadRoomList();const p=await parseInstagramZip($("zipFile").files[0]);classify(p.followers,p.following);updateSummary();showTab('all');$("summarySection").classList.remove('hidden');$("resultsSection").classList.remove('hidden');$("status").textContent=`분석 완료 · 단톡방 ${roomList.length}명 기준`;toast("분석 완료")}catch(e){$("status").textContent=`오류: ${e.message}`;toast("분석 실패")}finally{b.disabled=false;b.innerHTML='맞팔 분석 시작 <span>→</span>'}}
+async function analyze(){if(matchLocked){toast("현재 맞팔확인 기능이 잠겨 있습니다.");return}const b=$("analyzeBtn");try{b.disabled=true;b.textContent="분석 중...";if(!roomList.length)await loadRoomList();const p=await parseInstagramZip($("zipFile").files[0]);classify(p.followers,p.following);updateSummary();showTab('all');$("summarySection").classList.remove('hidden');$("resultsSection").classList.remove('hidden');$("status").textContent=`분석 완료 · 단톡방 ${roomList.length}명 기준`;toast("분석 완료")}catch(e){$("status").textContent=`오류: ${e.message}`;toast("분석 실패")}finally{b.disabled=false;b.innerHTML='맞팔 분석 시작 <span>→</span>'}}
 function pct(n,t){return t?`${((n/t)*100).toFixed(1)}%`:'0%'}function updateSummary(){const t=result.all.length;for(const k of ['mutual','onlyMe','fansOnly','neither']){$(`${k}Count`).textContent=`${result[k].length}명`;$(`${k}Rate`).textContent=pct(result[k].length,t);$(`tab${k[0].toUpperCase()+k.slice(1)}`).textContent=result[k].length}$("tabAll").textContent=t;$("rateText").innerHTML=`단톡방 맞팔률 <strong>${pct(result.mutual.length,t)}</strong> · ${result.mutual.length}/${t}명`}
 function label(s){return{mutual:'맞팔 완료',onlyMe:'나만 팔로우 함',fansOnly:'상대가 팔로우만 함',neither:'서로 팔로우 안 함'}[s]}
 function showTab(t){currentTab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));renderMatchList()}
@@ -35,5 +35,32 @@ function renderNotices(){const a=notices();$("adminNotices").textContent=`${a.le
 function adminLogin(){if($("adminPassword").value===String(config.adminPassword||'0702')){adminLoggedIn=true;$("adminPanel").classList.remove('hidden');$("adminLoginCard").classList.add('hidden');renderNotices();toast('운영진 로그인 완료')}else{$("adminLoginMsg").textContent='비밀번호가 다릅니다.';toast('로그인 실패')}}
 function adminLogout(){adminLoggedIn=false;$("adminPanel").classList.add('hidden');$("adminLoginCard").classList.remove('hidden');$("adminPassword").value=''}
 function saveNotice(){const title=$("noticeTitle").value.trim(),body=$("noticeBody").value.trim();if(!title||!body)return toast('제목과 내용을 입력해 주세요.');const a=notices();a.unshift({title,body,createdAt:new Date().toISOString()});saveNotices(a);$("noticeTitle").value='';$("noticeBody").value='';toast('공지 저장 완료')}
+
+function loadMatchLock(){
+  matchLocked=localStorage.getItem('yb_match_locked')==='1';
+  applyMatchLock();
+}
+function applyMatchLock(){
+  const lockCard=$("matchLockCard"),content=$("matchContent"),state=$("matchLockState");
+  if(lockCard)lockCard.classList.toggle('hidden',!matchLocked);
+  if(content)content.classList.toggle('hidden',matchLocked);
+  if(state){
+    state.textContent=matchLocked?'잠금 중':'사용 가능';
+    state.classList.toggle('locked',matchLocked);
+    state.classList.toggle('unlocked',!matchLocked);
+  }
+}
+function setMatchLock(locked){
+  matchLocked=Boolean(locked);
+  localStorage.setItem('yb_match_locked',matchLocked?'1':'0');
+  applyMatchLock();
+  if(matchLocked){
+    reset();
+    toast('맞팔확인 기능을 잠갔습니다.');
+  }else{
+    toast('맞팔확인 잠금을 해제했습니다.');
+  }
+}
+
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>showView(b.dataset.view));$("followSearch").oninput=renderFollowList;$("refreshFollowBtn").onclick=()=>loadRoomList(true);$("reloadRoomBtn").onclick=()=>loadRoomList(true);$("zipFile").onchange=()=>$("fileName").textContent=$("zipFile").files[0]?.name||'인스타그램 ZIP 파일 선택';$("analyzeBtn").onclick=analyze;$("resetBtn").onclick=reset;$("searchInput").oninput=renderMatchList;$("copyBtn").onclick=copyCurrent;$("csvBtn").onclick=downloadCsv;document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));$("adminLoginBtn").onclick=adminLogin;$("adminPassword").onkeydown=e=>{if(e.key==='Enter')adminLogin()};$("adminLogoutBtn").onclick=adminLogout;$("openSheetBtn").onclick=()=>window.open(sheetUrl(),'_blank');$("adminRefreshBtn").onclick=()=>loadRoomList(true);$("saveNoticeBtn").onclick=saveNotice;$("closeNoticeBtn").onclick=()=>$("noticeCard").classList.add('hidden');window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});$("installBtn").onclick=async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else toast('브라우저 메뉴에서 홈 화면에 추가를 눌러주세요.')};window.addEventListener('DOMContentLoaded',async()=>{await loadConfig();await loadRoomList();renderNotices();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=18').catch(()=>{})});
+document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>showView(b.dataset.view));$("followSearch").oninput=renderFollowList;$("refreshFollowBtn").onclick=()=>loadRoomList(true);$("reloadRoomBtn").onclick=()=>loadRoomList(true);$("zipFile").onchange=()=>$("fileName").textContent=$("zipFile").files[0]?.name||'인스타그램 ZIP 파일 선택';$("analyzeBtn").onclick=analyze;$("resetBtn").onclick=reset;$("searchInput").oninput=renderMatchList;$("copyBtn").onclick=copyCurrent;$("csvBtn").onclick=downloadCsv;document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));$("adminLoginBtn").onclick=adminLogin;$("adminPassword").onkeydown=e=>{if(e.key==='Enter')adminLogin()};$("adminLogoutBtn").onclick=adminLogout;$("openSheetBtn").onclick=()=>window.open(sheetUrl(),'_blank');$("adminRefreshBtn").onclick=()=>loadRoomList(true);$("saveNoticeBtn").onclick=saveNotice;$("lockMatchBtn").onclick=()=>setMatchLock(true);$("unlockMatchBtn").onclick=()=>setMatchLock(false);$("closeNoticeBtn").onclick=()=>$("noticeCard").classList.add('hidden');window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});$("installBtn").onclick=async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else toast('브라우저 메뉴에서 홈 화면에 추가를 눌러주세요.')};window.addEventListener('DOMContentLoaded',async()=>{await loadConfig();loadMatchLock();await loadRoomList();renderNotices();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=181').catch(()=>{})});

@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-title" content="여우방 맞팔확인" />
   <meta name="description" content="단톡방 맞팔확인과 팔로우리스트" />
   <title>여우방 맞팔확인</title>
-  <link rel="manifest" href="manifest.json?v=180" />
+  <link rel="manifest" href="manifest.json?v=181" />
   <link rel="icon" href="favicon.png" type="image/png" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=180" />
+  <link rel="stylesheet" href="style.css?v=181" />
 </head>
 <body>
 <header class="header">
@@ -19,7 +19,7 @@
     <span class="brand-symbol" aria-hidden="true">
       <svg viewBox="0 0 48 48"><circle cx="18" cy="17" r="6"/><circle cx="31" cy="16" r="5"/><path d="M7 38c0-8 5-13 11-13s11 5 11 13M25 37c0-7 4-11 9-11s8 4 8 11"/></svg>
     </span>
-    <div><h1>여우방 맞팔확인</h1><p>V18 · BOTTOM NAV</p></div>
+    <div><h1>여우방 맞팔확인</h1><p>V18.1 · LOCK CONTROL</p></div>
   </div>
   <button id="installBtn" class="install" type="button">⚙ 앱설치</button>
 </header>
@@ -51,6 +51,14 @@
   </section>
 
   <section id="matchView" class="view">
+
+    <section id="matchLockCard" class="card lock-card hidden">
+      <div class="lock-icon">🔒</div>
+      <h2>맞팔확인 잠금 중</h2>
+      <p>현재 운영진이 맞팔확인 기능을 잠가두었습니다.</p>
+      <p class="subtext">운영진에서 잠금을 해제한 뒤 이용할 수 있습니다.</p>
+    </section>
+    <div id="matchContent">
     <section class="card start-card">
       <div class="room-row">
         <div class="room-info"><span>단톡방 명단</span><strong id="roomState">불러오는 중</strong></div>
@@ -78,6 +86,7 @@
       <div class="table-head"><span>번호</span><span>닉네임</span><span>아이디</span><span>상태</span><span>바로가기</span></div>
       <div id="list" class="list"></div>
     </section>
+    </div>
   </section>
 
   <section id="adminView" class="view">
@@ -90,6 +99,20 @@
       <div class="section-title-row"><h2>운영진 기능</h2><button id="adminLogoutBtn" class="outline small" type="button">로그아웃</button></div>
       <div class="admin-actions"><button id="openSheetBtn" class="outline" type="button">구글시트 열기</button><button id="adminRefreshBtn" class="outline" type="button">명단 새로고침</button></div>
       <div class="stats-grid compact admin-stats"><article><span>전체 인원</span><strong id="adminTotal">0명</strong></article><article><span>전체 조</span><strong id="adminGroups">0조</strong></article><article><span>공지 수</span><strong id="adminNotices">0개</strong></article><article><span>명단 상태</span><strong id="adminSheetState">대기</strong></article></div>
+
+      <hr />
+      <div class="section-title-row">
+        <div>
+          <h3>맞팔확인 잠금 설정</h3>
+          <p class="subtext">이 기기에서 맞팔확인 메뉴 사용을 잠그거나 해제합니다.</p>
+        </div>
+        <span id="matchLockState" class="lock-state unlocked">사용 가능</span>
+      </div>
+      <div class="admin-actions">
+        <button id="lockMatchBtn" class="outline danger-outline" type="button">🔒 맞팔확인 잠그기</button>
+        <button id="unlockMatchBtn" class="outline success-outline" type="button">🔓 맞팔확인 잠금 해제</button>
+      </div>
+
       <hr />
       <h3>공지 작성</h3>
       <input id="noticeTitle" type="text" placeholder="공지 제목" />
@@ -99,7 +122,7 @@
     </section>
   </section>
 </main>
-<footer><span>© 2026 YEOWOOBANG</span><span>Version 18.0</span></footer>
+<footer><span>© 2026 YEOWOOBANG</span><span>Version 18.1</span></footer>
 
 <nav class="bottom-nav" aria-label="주요 메뉴">
   <button class="nav-btn active" data-view="followView" type="button"><span class="nav-icon">☷</span><span>팔로우리스트</span></button>
@@ -108,5 +131,5 @@
 </nav>
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=180"></script>
+<script src="app.js?v=181"></script>
 </body></html>
