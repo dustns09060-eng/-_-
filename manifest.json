@@ -1,7 +1,7 @@
 {
   "name": "여우방 맞팔확인",
   "short_name": "여우방 맞팔확인",
-  "start_url": "./?v=171",
+  "start_url": "./?v=180",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f7f8fa",
