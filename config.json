@@ -1,6 +1,7 @@
 {
-  "version": "V16 SIMPLE",
+  "version": "V17 FOLLOW LIST",
   "sheetId": "1QfguFyvtgNUyfd4-ufMxAWRwItHuIY6M4wGAQstteW0",
-  "sheetName": "단톡방명단",
-  "fallbackCsv": "room-list.csv"
+  "sheetName": "Sheet1",
+  "fallbackCsv": "room-list.csv",
+  "adminPassword": "0702"
 }

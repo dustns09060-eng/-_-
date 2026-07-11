@@ -1,14 +1,21 @@
 {
   "name": "여우방 맞팔확인",
   "short_name": "여우방 맞팔확인",
-  "description": "단톡방 명단 기준 인스타그램 맞팔 확인",
-  "start_url": "./?v=16",
+  "start_url": "./?v=17",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#fafafa",
+  "background_color": "#f7f8fa",
   "theme_color": "#ffffff",
   "icons": [
-    {"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }

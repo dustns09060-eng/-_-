@@ -1,176 +1,39 @@
-const $ = id => document.getElementById(id);
-let roomList = [];
-let result = { all: [], mutual: [], onlyMe: [], fansOnly: [], neither: [] };
-let currentTab = "all";
-let installPrompt = null;
-let config = {sheetId:"",sheetName:"단톡방명단",fallbackCsv:"room-list.csv"};
-
-function toast(message){
-  const el=$("toast"); el.textContent=message; el.style.display="block";
-  clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.style.display="none",1800);
-}
-function normalize(value){
-  return String(value||"").trim().toLowerCase()
-    .replace(/^https?:\/\/(www\.)?instagram\.com\//,"")
-    .replace(/^instagram\.com\//,"").replace(/^_u\//,"")
-    .replace(/^@+/,"").replace(/[?#].*$/,"").replace(/\/+$/,"").trim();
-}
-function validUsername(value){
-  return /^[a-z0-9._]{1,30}$/.test(value) && !["instagram","accounts","explore","direct","p","reels","stories","www","about","privacy","terms","login","_u"].includes(value);
-}
-function unique(values){
-  const set=new Set();
-  for(const value of values||[]){const id=normalize(value); if(validUsername(id)) set.add(id)}
-  return [...set];
-}
-function parseCsv(text){
-  const rows=[]; let row=[],cell="",quoted=false;
-  for(let i=0;i<text.length;i++){
-    const ch=text[i],next=text[i+1];
-    if(ch==='"'&&quoted&&next==='"'){cell+='"';i++;continue}
-    if(ch==='"'){quoted=!quoted;continue}
-    if(ch===','&&!quoted){row.push(cell);cell="";continue}
-    if((ch==='\n'||ch==='\r')&&!quoted){if(cell||row.length){row.push(cell);rows.push(row);row=[];cell=""}if(ch==='\r'&&next==='\n')i++;continue}
-    cell+=ch;
-  }
-  if(cell||row.length){row.push(cell);rows.push(row)}
-  return rows;
-}
-function rowsToRoom(rows){
-  const list=[];
-  for(let i=0;i<rows.length;i++){
-    const r=rows[i]; const joined=r.join(" ");
-    if(i===0&&(joined.includes("번호")||joined.includes("닉네임")||joined.includes("아이디"))) continue;
-    const id=normalize(r[2]||r[1]||r[0]);
-    if(validUsername(id)) list.push({no:r[0]||list.length+1,name:r[1]||"",id});
-  }
-  const seen=new Set(); return list.filter(x=>!seen.has(x.id)&&seen.add(x.id));
-}
-async function loadConfig(){
-  try{const res=await fetch(`config.json?t=${Date.now()}`,{cache:"no-store"}); if(res.ok) config={...config,...await res.json()}}catch{}
-}
-async function loadRoomList(showToast=false){
-  $("roomState").textContent="불러오는 중";
-  const urls=[];
-  if(config.sheetId){
-    const sheet=encodeURIComponent(config.sheetName||"단톡방명단");
-    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
-    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
-  }
-  urls.push(`${config.fallbackCsv||"room-list.csv"}?t=${Date.now()}`);
-  let lastError="";
-  for(const url of urls){
-    try{
-      const res=await fetch(url,{cache:"no-store"}); if(!res.ok) throw Error(`HTTP ${res.status}`);
-      const text=await res.text(); const list=rowsToRoom(parseCsv(text));
-      if(!list.length) throw Error("0명");
-      roomList=list; $("roomState").textContent=`${list.length}명 준비 완료`;
-      $("status").textContent="ZIP 파일을 선택하고 분석을 시작하세요.";
-      if(showToast) toast("단톡방 명단 새로고침 완료"); return;
-    }catch(e){lastError=e.message}
-  }
-  $("roomState").textContent="명단 오류";
-  $("status").textContent=`단톡방 명단을 불러오지 못했습니다. (${lastError})`;
-  if(showToast) toast("명단 불러오기 실패");
-}
-function findFiles(zip){
-  const files=Object.keys(zip.files).filter(p=>!zip.files[p].dir);
-  const followers=files.filter(p=>/followers_\d+\.(html|json)$/i.test(p.replace(/\\/g,"/").split("/").pop()));
-  const following=files.find(p=>/^following\.(html|json)$/i.test(p.replace(/\\/g,"/").split("/").pop()));
-  return {followers,following};
-}
-function extractHtml(text){
-  const ids=[]; let m;
-  const re=/href=["']https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]+)\/?[^"']*["']/gi;
-  while((m=re.exec(text))) ids.push(m[1]);
-  if(!ids.length){const re2=/https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]+)/gi;while((m=re2.exec(text)))ids.push(m[1])}
-  return unique(ids);
-}
-function walkJson(value,out){
-  if(value==null)return;
-  if(typeof value==="string"){const id=normalize(value);if(validUsername(id))out.push(id);return}
-  if(Array.isArray(value)){value.forEach(v=>walkJson(v,out));return}
-  if(typeof value==="object"){if(value.value)walkJson(value.value,out);if(value.href)walkJson(value.href,out);if(value.username)walkJson(value.username,out);Object.values(value).forEach(v=>walkJson(v,out))}
-}
-function extractJson(text){const out=[];try{walkJson(JSON.parse(text),out)}catch{}return unique(out)}
-async function parseInstagramZip(file){
-  if(!file) throw Error("ZIP 파일을 선택해 주세요.");
-  if(!window.JSZip) throw Error("ZIP 분석 라이브러리를 불러오지 못했습니다.");
-  const zip=await JSZip.loadAsync(file); const paths=findFiles(zip);
-  if(!paths.followers.length) throw Error("followers_1.html 또는 JSON을 찾지 못했습니다.");
-  if(!paths.following) throw Error("following.html 또는 JSON을 찾지 못했습니다.");
-  let followers=[];
-  for(const path of paths.followers){const text=await zip.files[path].async("string");followers.push(...(path.toLowerCase().endsWith(".json")?extractJson(text):extractHtml(text)))}
-  const followingText=await zip.files[paths.following].async("string");
-  const following=paths.following.toLowerCase().endsWith(".json")?extractJson(followingText):extractHtml(followingText);
-  followers=unique(followers);
-  if(!followers.length||!following.length) throw Error("팔로워 또는 팔로잉 계정을 읽지 못했습니다.");
-  return {followers,following};
-}
-function classify(followers,following){
-  const F=new Set(followers),G=new Set(following);
-  const all=roomList.map(person=>{
-    let status="neither";
-    if(F.has(person.id)&&G.has(person.id)) status="mutual";
-    else if(!F.has(person.id)&&G.has(person.id)) status="onlyMe";
-    else if(F.has(person.id)&&!G.has(person.id)) status="fansOnly";
-    return {...person,status};
-  });
-  result={all,mutual:all.filter(x=>x.status==="mutual"),onlyMe:all.filter(x=>x.status==="onlyMe"),fansOnly:all.filter(x=>x.status==="fansOnly"),neither:all.filter(x=>x.status==="neither")};
-}
-async function analyze(){
-  const btn=$("analyzeBtn");
-  try{
-    btn.disabled=true;btn.textContent="분석 중...";
-    if(!roomList.length) await loadRoomList(false);
-    if(!roomList.length) throw Error("단톡방 명단을 불러오지 못했습니다.");
-    $("status").textContent="ZIP 파일을 읽고 단톡방 명단과 비교하고 있습니다.";
-    const parsed=await parseInstagramZip($("zipFile").files[0]);
-    classify(parsed.followers,parsed.following);
-    updateSummary(); showTab("all");
-    $("summarySection").classList.remove("hidden");$("resultsSection").classList.remove("hidden");
-    $("status").textContent=`분석 완료 · 단톡방 ${roomList.length}명 기준`;
-    toast("분석 완료");
-  }catch(e){$("status").textContent=`오류: ${e.message}`;toast("분석 실패")}
-  finally{btn.disabled=false;btn.innerHTML='맞팔 분석 시작 <span>→</span>'}
-}
-function pct(n,total){return total?`${((n/total)*100).toFixed(1)}%`:"0%"}
-function updateSummary(){
-  const total=result.all.length;
-  $("mutualCount").textContent=`${result.mutual.length}명`;$("onlyMeCount").textContent=`${result.onlyMe.length}명`;$("fansOnlyCount").textContent=`${result.fansOnly.length}명`;$("neitherCount").textContent=`${result.neither.length}명`;
-  $("mutualRate").textContent=pct(result.mutual.length,total);$("onlyMeRate").textContent=pct(result.onlyMe.length,total);$("fansOnlyRate").textContent=pct(result.fansOnly.length,total);$("neitherRate").textContent=pct(result.neither.length,total);
-  $("tabAll").textContent=result.all.length;$("tabMutual").textContent=result.mutual.length;$("tabOnlyMe").textContent=result.onlyMe.length;$("tabFansOnly").textContent=result.fansOnly.length;$("tabNeither").textContent=result.neither.length;
-  const rate=total?((result.mutual.length/total)*100).toFixed(1):"0.0";
-  $("rateText").innerHTML=`단톡방 맞팔률 <strong>${rate}%</strong> · ${result.mutual.length}/${total}명`;
-}
-function label(status){return {mutual:"맞팔 완료",onlyMe:"나만 팔로우 함",fansOnly:"상대가 팔로우만 함",neither:"서로 팔로우 안 함"}[status]}
-function showTab(tab){currentTab=tab;document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));renderList()}
-function filtered(){
-  const q=String($("searchInput").value||"").trim().toLowerCase(); const list=result[currentTab]||[];
-  return q?list.filter(x=>x.id.includes(normalize(q))||String(x.name||"").toLowerCase().includes(q)):list;
-}
-function renderList(){
-  const items=filtered();
-  $("list").innerHTML=items.length?items.map((x,i)=>`<div class="item"><span class="no">${i+1}</span><span class="name">${escapeHtml(x.name||"")}</span><a class="id" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener noreferrer">@${escapeHtml(x.id)}</a><span class="badge ${x.status}">${label(x.status)}</span><a class="insta" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener noreferrer">인스타</a></div>`).join(""):'<div class="empty-state"><span class="empty-icon">▣</span><strong>해당 결과가 없습니다.</strong><p>다른 탭이나 검색어를 확인해 주세요.</p></div>';
-}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-async function copyCurrent(){
-  let items=currentTab==="all"?[...result.onlyMe,...result.neither]:filtered();
-  if(!items.length)return toast("복사할 미맞팔 명단이 없습니다.");
-  const text=items.map((x,i)=>`${i+1}. ${x.name||""} @${x.id} - ${label(x.status)}`).join("\n");
-  try{await navigator.clipboard.writeText(text);toast("미맞팔 명단 복사 완료")}catch{toast("복사를 지원하지 않는 브라우저입니다.")}
-}
-function downloadCsv(){
-  const items=filtered(); if(!items.length)return toast("다운로드할 명단이 없습니다.");
-  const rows=[["번호","닉네임","아이디","상태"],...items.map((x,i)=>[i+1,x.name,`@${x.id}`,label(x.status)])];
-  const csv="\ufeff"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\r\n");
-  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`여우방_${currentTab}_명단.csv`;a.click();URL.revokeObjectURL(url);
-}
-function reset(){
-  $("zipFile").value="";$("fileName").textContent="인스타그램 ZIP 파일 선택";$("summarySection").classList.add("hidden");$("resultsSection").classList.add("hidden");$("status").textContent="ZIP 파일을 선택하고 분석을 시작하세요.";result={all:[],mutual:[],onlyMe:[],fansOnly:[],neither:[]};window.scrollTo({top:0,behavior:"smooth"});
-}
-$("zipFile").addEventListener("change",()=>{$("fileName").textContent=$("zipFile").files[0]?.name||"인스타그램 ZIP 파일 선택"});
-$("analyzeBtn").addEventListener("click",analyze);$("reloadRoomBtn").addEventListener("click",()=>loadRoomList(true));$("resetBtn").addEventListener("click",reset);$("searchInput").addEventListener("input",renderList);$("copyBtn").addEventListener("click",copyCurrent);$("csvBtn").addEventListener("click",downloadCsv);document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installPrompt=e});
-$("installBtn").addEventListener("click",async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else toast("브라우저 메뉴에서 홈 화면에 추가를 눌러주세요.")});
-window.addEventListener("DOMContentLoaded",async()=>{await loadConfig();await loadRoomList(false);if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js?v=16").catch(()=>{})});
+const $=id=>document.getElementById(id);let roomList=[],result={all:[],mutual:[],onlyMe:[],fansOnly:[],neither:[]},currentTab="all",currentGroup=0,installPrompt=null,adminLoggedIn=false;let config={sheetId:"",sheetName:"Sheet1",fallbackCsv:"room-list.csv",adminPassword:"0702"};
+function toast(m){const e=$("toast");e.textContent=m;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",1800)}
+function normalize(v){return String(v||"").trim().toLowerCase().replace(/^https?:\/\/(www\.)?instagram\.com\//,"").replace(/^instagram\.com\//,"").replace(/^_u\//,"").replace(/^@+/,"").replace(/[?#].*$/,"").replace(/\/+$/,"").trim()}
+function validUsername(v){return /^[a-z0-9._]{1,30}$/.test(v)&&!["instagram","accounts","explore","direct","p","reels","stories","www","about","privacy","terms","login","_u"].includes(v)}
+function unique(a){const s=new Set();for(const v of a||[]){const id=normalize(v);if(validUsername(id))s.add(id)}return[...s]}
+function parseCsv(t){const rows=[];let r=[],c="",q=false;for(let i=0;i<t.length;i++){const ch=t[i],n=t[i+1];if(ch==='"'&&q&&n==='"'){c+='"';i++;continue}if(ch==='"'){q=!q;continue}if(ch===','&&!q){r.push(c);c="";continue}if((ch==='\n'||ch==='\r')&&!q){if(c||r.length){r.push(c);rows.push(r);r=[];c=""}if(ch==='\r'&&n==='\n')i++;continue}c+=ch}if(c||r.length){r.push(c);rows.push(r)}return rows}
+function rowsToRoom(rows){const list=[];rows.forEach((r,i)=>{const joined=r.join(" ");if(i===0&&(joined.includes("번호")||joined.includes("닉네임")||joined.includes("아이디")))return;const id=normalize(r[2]||r[1]||r[0]);if(validUsername(id))list.push({no:r[0]||list.length+1,name:r[1]||"",id})});const seen=new Set();return list.filter(x=>!seen.has(x.id)&&seen.add(x.id))}
+async function loadConfig(){try{const r=await fetch(`config.json?t=${Date.now()}`,{cache:"no-store"});if(r.ok)config={...config,...await r.json()}}catch{}}
+function sheetUrl(){return `https://docs.google.com/spreadsheets/d/${config.sheetId}/edit`}
+async function loadRoomList(show=false){setSheetState("불러오는 중");const urls=[];if(config.sheetId){const s=encodeURIComponent(config.sheetName||"Sheet1");urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${s}&t=${Date.now()}`);urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${s}&t=${Date.now()}`)}urls.push(`${config.fallbackCsv||"room-list.csv"}?t=${Date.now()}`);let err="";for(const u of urls){try{const r=await fetch(u,{cache:"no-store"});if(!r.ok)throw Error(`HTTP ${r.status}`);const list=rowsToRoom(parseCsv(await r.text()));if(!list.length)throw Error("0명");roomList=list;setSheetState("정상");updateFollowStats();renderGroupTabs();renderFollowList();if(show)toast("명단 새로고침 완료");return}catch(e){err=e.message}}setSheetState("오류");$("followState").textContent=`명단을 불러오지 못했습니다. (${err})`;if(show)toast("명단 불러오기 실패")}
+function setSheetState(s){if($("roomState"))$("roomState").textContent=s==="정상"?`${roomList.length}명 준비 완료`:s;if($("adminSheetState"))$("adminSheetState").textContent=s}
+function updateFollowStats(){const groups=Math.ceil(roomList.length/500);$("followTotal").textContent=`${roomList.length}명`;$("groupTotal").textContent=`${groups}조`;$("lastRefresh").textContent=new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});$("adminTotal").textContent=`${roomList.length}명`;$("adminGroups").textContent=`${groups}조`;$("followState").textContent=`전체 ${roomList.length}명 · 500명씩 ${groups}개 조`}
+function renderGroupTabs(){const total=Math.max(1,Math.ceil(roomList.length/500));$("groupTabs").innerHTML=['전체',...Array.from({length:total},(_,i)=>`${i+1}조`)].map((t,i)=>`<button class="group-tab ${i===currentGroup?'active':''}" data-group="${i}">${t}</button>`).join("");document.querySelectorAll(".group-tab").forEach(b=>b.onclick=()=>{currentGroup=Number(b.dataset.group);renderGroupTabs();renderFollowList()})}
+function followFiltered(){const q=String($("followSearch").value||"").trim().toLowerCase();let a=roomList;if(currentGroup>0)a=a.slice((currentGroup-1)*500,currentGroup*500);return q?a.filter(x=>String(x.no).includes(q)||x.id.includes(normalize(q))||String(x.name).toLowerCase().includes(q)):a}
+function renderFollowList(){const a=followFiltered();$("followList").innerHTML=a.length?a.map(x=>`<div class="follow-item"><span>${escapeHtml(x.no)}</span><span>${escapeHtml(x.name)}</span><a href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener">@${escapeHtml(x.id)}</a><a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank" rel="noopener">인스타</a></div>`).join(""):'<div class="empty-state">검색 결과가 없습니다.</div>'}
+function showView(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===id));window.scrollTo({top:0,behavior:'smooth'})}
+function findFiles(zip){const f=Object.keys(zip.files).filter(p=>!zip.files[p].dir);return{followers:f.filter(p=>/followers_\d+\.(html|json)$/i.test(p.replace(/\\/g,"/").split("/").pop())),following:f.find(p=>/^following\.(html|json)$/i.test(p.replace(/\\/g,"/").split("/").pop()))}}
+function extractHtml(t){const ids=[];let m,r=/href=["']https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]+)\/?[^"']*["']/gi;while((m=r.exec(t)))ids.push(m[1]);if(!ids.length){r=/https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]+)/gi;while((m=r.exec(t)))ids.push(m[1])}return unique(ids)}
+function walkJson(v,o){if(v==null)return;if(typeof v==='string'){const id=normalize(v);if(validUsername(id))o.push(id);return}if(Array.isArray(v)){v.forEach(x=>walkJson(x,o));return}if(typeof v==='object')Object.values(v).forEach(x=>walkJson(x,o))}
+function extractJson(t){const o=[];try{walkJson(JSON.parse(t),o)}catch{}return unique(o)}
+async function parseInstagramZip(file){if(!file)throw Error("ZIP 파일을 선택해 주세요.");if(!window.JSZip)throw Error("ZIP 분석 라이브러리를 불러오지 못했습니다.");const z=await JSZip.loadAsync(file),p=findFiles(z);if(!p.followers.length)throw Error("followers_1 파일을 찾지 못했습니다.");if(!p.following)throw Error("following 파일을 찾지 못했습니다.");let followers=[];for(const path of p.followers){const t=await z.files[path].async("string");followers.push(...(path.endsWith('.json')?extractJson(t):extractHtml(t)))}const gt=await z.files[p.following].async("string"),following=p.following.endsWith('.json')?extractJson(gt):extractHtml(gt);return{followers:unique(followers),following}}
+function classify(followers,following){const F=new Set(followers),G=new Set(following),all=roomList.map(p=>({...p,status:F.has(p.id)&&G.has(p.id)?'mutual':!F.has(p.id)&&G.has(p.id)?'onlyMe':F.has(p.id)&&!G.has(p.id)?'fansOnly':'neither'}));result={all,mutual:all.filter(x=>x.status==='mutual'),onlyMe:all.filter(x=>x.status==='onlyMe'),fansOnly:all.filter(x=>x.status==='fansOnly'),neither:all.filter(x=>x.status==='neither')}}
+async function analyze(){const b=$("analyzeBtn");try{b.disabled=true;b.textContent="분석 중...";if(!roomList.length)await loadRoomList();const p=await parseInstagramZip($("zipFile").files[0]);classify(p.followers,p.following);updateSummary();showTab('all');$("summarySection").classList.remove('hidden');$("resultsSection").classList.remove('hidden');$("status").textContent=`분석 완료 · 단톡방 ${roomList.length}명 기준`;toast("분석 완료")}catch(e){$("status").textContent=`오류: ${e.message}`;toast("분석 실패")}finally{b.disabled=false;b.innerHTML='맞팔 분석 시작 <span>→</span>'}}
+function pct(n,t){return t?`${((n/t)*100).toFixed(1)}%`:'0%'}function updateSummary(){const t=result.all.length;for(const k of ['mutual','onlyMe','fansOnly','neither']){$(`${k}Count`).textContent=`${result[k].length}명`;$(`${k}Rate`).textContent=pct(result[k].length,t);$(`tab${k[0].toUpperCase()+k.slice(1)}`).textContent=result[k].length}$("tabAll").textContent=t;$("rateText").innerHTML=`단톡방 맞팔률 <strong>${pct(result.mutual.length,t)}</strong> · ${result.mutual.length}/${t}명`}
+function label(s){return{mutual:'맞팔 완료',onlyMe:'나만 팔로우 함',fansOnly:'상대가 팔로우만 함',neither:'서로 팔로우 안 함'}[s]}
+function showTab(t){currentTab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));renderMatchList()}
+function matchFiltered(){const q=String($("searchInput").value||'').trim().toLowerCase(),a=result[currentTab]||[];return q?a.filter(x=>x.id.includes(normalize(q))||String(x.name).toLowerCase().includes(q)):a}
+function renderMatchList(){const a=matchFiltered();$("list").innerHTML=a.length?a.map((x,i)=>`<div class="item"><span>${i+1}</span><span>${escapeHtml(x.name)}</span><a class="id" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank">@${escapeHtml(x.id)}</a><span class="badge ${x.status}">${label(x.status)}</span><a class="insta" href="https://www.instagram.com/${encodeURIComponent(x.id)}/" target="_blank">인스타</a></div>`).join(''):'<div class="empty-state">결과가 없습니다.</div>'}
+async function copyCurrent(){const a=currentTab==='all'?[...result.onlyMe,...result.neither]:matchFiltered();if(!a.length)return toast('복사할 명단이 없습니다.');await navigator.clipboard.writeText(a.map((x,i)=>`${i+1}. ${x.name} @${x.id} - ${label(x.status)}`).join('\n'));toast('복사 완료')}
+function downloadCsv(){const a=matchFiltered();if(!a.length)return toast('다운로드할 명단이 없습니다.');const rows=[["번호","닉네임","아이디","상태"],...a.map((x,i)=>[i+1,x.name,`@${x.id}`,label(x.status)])],csv='\ufeff'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n'),u=URL.createObjectURL(new Blob([csv],{type:'text/csv'})),el=document.createElement('a');el.href=u;el.download='여우방_명단.csv';el.click();URL.revokeObjectURL(u)}
+function reset(){$("zipFile").value='';$("fileName").textContent='인스타그램 ZIP 파일 선택';$("summarySection").classList.add('hidden');$("resultsSection").classList.add('hidden')}
+function notices(){try{return JSON.parse(localStorage.getItem('yb_notices')||'[]')}catch{return[]}}
+function saveNotices(a){localStorage.setItem('yb_notices',JSON.stringify(a));renderNotices()}
+function renderNotices(){const a=notices();$("adminNotices").textContent=`${a.length}개`;$("noticeCard").classList.toggle('hidden',!a.length);$("noticeList").innerHTML=a.map(n=>`<div class="notice-item"><h4>${escapeHtml(n.title)}</h4><p>${escapeHtml(n.body)}</p></div>`).join('');$("adminNoticeList").innerHTML=a.length?a.map((n,i)=>`<div class="notice-row"><div><strong>${escapeHtml(n.title)}</strong><div class="subtext">${escapeHtml(n.body)}</div></div><button data-del="${i}">삭제</button></div>`).join(''):'<p class="state-text">등록된 공지가 없습니다.</p>';document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const x=notices();x.splice(Number(b.dataset.del),1);saveNotices(x);toast('공지 삭제 완료')})}
+function adminLogin(){if($("adminPassword").value===String(config.adminPassword||'0702')){adminLoggedIn=true;$("adminPanel").classList.remove('hidden');$("adminLoginCard").classList.add('hidden');renderNotices();toast('운영진 로그인 완료')}else{$("adminLoginMsg").textContent='비밀번호가 다릅니다.';toast('로그인 실패')}}
+function adminLogout(){adminLoggedIn=false;$("adminPanel").classList.add('hidden');$("adminLoginCard").classList.remove('hidden');$("adminPassword").value=''}
+function saveNotice(){const title=$("noticeTitle").value.trim(),body=$("noticeBody").value.trim();if(!title||!body)return toast('제목과 내용을 입력해 주세요.');const a=notices();a.unshift({title,body,createdAt:new Date().toISOString()});saveNotices(a);$("noticeTitle").value='';$("noticeBody").value='';toast('공지 저장 완료')}
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>showView(b.dataset.view));$("followSearch").oninput=renderFollowList;$("refreshFollowBtn").onclick=()=>loadRoomList(true);$("reloadRoomBtn").onclick=()=>loadRoomList(true);$("zipFile").onchange=()=>$("fileName").textContent=$("zipFile").files[0]?.name||'인스타그램 ZIP 파일 선택';$("analyzeBtn").onclick=analyze;$("resetBtn").onclick=reset;$("searchInput").oninput=renderMatchList;$("copyBtn").onclick=copyCurrent;$("csvBtn").onclick=downloadCsv;document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));$("adminLoginBtn").onclick=adminLogin;$("adminPassword").onkeydown=e=>{if(e.key==='Enter')adminLogin()};$("adminLogoutBtn").onclick=adminLogout;$("openSheetBtn").onclick=()=>window.open(sheetUrl(),'_blank');$("adminRefreshBtn").onclick=()=>loadRoomList(true);$("saveNoticeBtn").onclick=saveNotice;$("closeNoticeBtn").onclick=()=>$("noticeCard").classList.add('hidden');window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});$("installBtn").onclick=async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else toast('브라우저 메뉴에서 홈 화면에 추가를 눌러주세요.')};window.addEventListener('DOMContentLoaded',async()=>{await loadConfig();await loadRoomList();renderNotices();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=17').catch(()=>{})});
