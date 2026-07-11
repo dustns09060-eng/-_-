@@ -106,3 +106,43 @@ body{padding-bottom:env(safe-area-inset-bottom)}
     grid-template-columns:1fr !important;
   }
 }
+
+
+/* V19 로고 및 앱 이름 */
+.brand-logo{
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  object-fit:cover;
+  flex:0 0 auto;
+  border:1px solid #f2ddcc;
+  box-shadow:0 3px 10px rgba(255,101,0,.12);
+}
+.brand-text h1{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  margin:0;
+  font-size:19px;
+  line-height:1.15;
+}
+.brand-text h1 span:last-child{
+  font-size:15px;
+  white-space:nowrap;
+}
+.brand-text p{
+  margin:4px 0 0;
+  color:var(--orange);
+  font-size:11px;
+}
+@media(max-width:420px){
+  .brand{gap:9px}
+  .brand-logo{width:45px;height:45px}
+  .brand-text h1{font-size:17px}
+  .brand-text h1 span:last-child{font-size:13px}
+  .install{font-size:13px;padding:9px 9px}
+}
+@media(max-width:350px){
+  .brand-text h1 span:last-child{font-size:11.5px}
+  .brand-logo{width:41px;height:41px}
+}
