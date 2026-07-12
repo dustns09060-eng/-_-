@@ -14,10 +14,10 @@ let matchGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V29";
+const APP_VERSION = "V30";
 
 let config = {
-  version: "V29 ENTRY LABELS",
+  version: "V30 NOTICE NAV",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -178,6 +178,7 @@ function hideGate() {
 
 function setAdminNavigation(enabled) {
   $("adminNavBtn")?.classList.toggle("hidden", !enabled);
+  $("noticeNavBtn")?.classList.toggle("hidden", enabled);
 }
 
 async function bootstrapAuth() {
@@ -741,6 +742,14 @@ function renderNotices(notices) {
     .map((notice) => `<div class="notice-item"><p>${escapeHtml(notice.content)}</p></div>`)
     .join("");
 
+  $("noticePageList").innerHTML = notices.length
+    ? notices.map((notice) => `
+      <article class="notice-page-item">
+        <div class="notice-page-time">${escapeHtml(notice.createdAt || "")}</div>
+        <p>${escapeHtml(notice.content)}</p>
+      </article>`).join("")
+    : '<p class="state-text">등록된 공지가 없습니다.</p>';
+
   $("adminNoticeList").innerHTML = notices.length
     ? notices.map((notice) => `
       <div class="notice-row">
@@ -898,6 +907,7 @@ $("changeMatchPasswordBtn").onclick = () => changePassword("changeMatchPassword"
 
 $("saveNoticeBtn").onclick = saveNotice;
 $("closeNoticeBtn").onclick = () => $("noticeCard").classList.add("hidden");
+$("refreshNoticeBtn").onclick = loadNotices;
 $("refreshLogsBtn").onclick = loadAdminLogs;
 $("updateNowBtn").onclick = async () => {
   if ("serviceWorker" in navigator) {
@@ -929,7 +939,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=290").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=300").catch(() => {});
   }
 
   setInterval(async () => {

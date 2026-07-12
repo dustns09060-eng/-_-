@@ -1,16 +1,16 @@
-const CACHE='yb-v290';
+const CACHE='yb-v300';
 const ASSETS=[
   './',
   './index.html',
-  './style.css?v=290',
-  './app.js?v=290',
-  './manifest.json?v=290',
-  './config.json?v=290',
-  './favicon-v20.png?v=290',
-  './icon-192-v20.png?v=290',
-  './icon-512-v20.png?v=290',
-  './app-logo-v20.png?v=290',
-  './preview-v26.png?v=290',
+  './style.css?v=300',
+  './app.js?v=300',
+  './manifest.json?v=300',
+  './config.json?v=300',
+  './favicon-v20.png?v=300',
+  './icon-192-v20.png?v=300',
+  './icon-512-v20.png?v=300',
+  './app-logo-v20.png?v=300',
+  './preview-v26.png?v=300',
   './room-list.csv'
 ];
 self.addEventListener('install',event=>{

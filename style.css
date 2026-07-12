@@ -257,3 +257,28 @@ body.gate-open{overflow:hidden}
 .access-role strong{font-size:20px}
 .access-role.general{background:linear-gradient(180deg,#fffaf6 0%,#fff6ee 100%);border-color:#ffd1ae}
 .access-role.admin{background:#fff}
+
+
+/* V30 일반 사용자 공지 하단 메뉴 */
+.notice-page-card{min-height:58vh}
+.notice-page-list{display:grid;gap:12px;margin-top:16px}
+.notice-page-item{
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:16px;
+  background:#fffaf6;
+}
+.notice-page-item p{
+  margin:6px 0 0;
+  line-height:1.65;
+  white-space:pre-wrap;
+  color:var(--text);
+}
+.notice-page-time{
+  font-size:12px;
+  color:var(--muted);
+}
+.bottom-nav .nav-btn{
+  flex:1;
+  min-width:0;
+}
