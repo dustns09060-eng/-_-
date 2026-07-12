@@ -2,152 +2,249 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#ffffff" />
   <meta name="application-name" content="여우방 팔로우리스트+맞팔확인" />
   <meta name="apple-mobile-web-app-title" content="여우방 팔로우리스트+맞팔확인" />
   <meta name="description" content="" />
   <title>여우방 팔로우리스트+맞팔확인</title>
-  <link rel="manifest" href="manifest.json?v=240" />
-  <link rel="icon" href="favicon-v20.png?v=240" type="image/png" />
-  <link rel="apple-touch-icon" href="icon-192-v20.png?v=240" />
-  <link rel="stylesheet" href="style.css?v=240" />
+  <link rel="canonical" href="https://dustns09060-eng.github.io/-_-/?v=260" />
+  <link rel="manifest" href="manifest.json?v=260" />
+  <link rel="icon" href="favicon-v20.png?v=260" type="image/png" />
+  <link rel="apple-touch-icon" href="icon-192-v20.png?v=260" />
+  <link rel="stylesheet" href="style.css?v=260" />
 
-  
-  <link rel="canonical" href="https://dustns09060-eng.github.io/-_-/?v=240" />
   <meta property="og:locale" content="ko_KR" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="여우방 팔로우리스트+맞팔확인" />
   <meta property="og:title" content="여우방 팔로우리스트+맞팔확인" />
   <meta property="og:description" content="" />
-  <meta property="og:url" content="https://dustns09060-eng.github.io/-_-/?v=240" />
-  <meta property="og:image" content="https://dustns09060-eng.github.io/-_-/preview-v24.png?v=240" />
-  <meta property="og:image:secure_url" content="https://dustns09060-eng.github.io/-_-/preview-v24.png?v=240" />
+  <meta property="og:url" content="https://dustns09060-eng.github.io/-_-/?v=260" />
+  <meta property="og:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=260" />
+  <meta property="og:image:secure_url" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=260" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="여우방 팔로우리스트+맞팔확인" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="여우방 팔로우리스트+맞팔확인" />
   <meta name="twitter:description" content="" />
-  <meta name="twitter:image" content="https://dustns09060-eng.github.io/-_-/preview-v24.png?v=240" />
-
+  <meta name="twitter:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=260" />
 </head>
 <body>
-<header class="header">
-  <div class="brand">
-    <img class="brand-logo" src="app-logo-v20.png?v=240" alt="여우방 로고" />
-    <div class="brand-text"><h1><span>여우방</span><span>팔로우리스트+맞팔확인</span></h1><p>V24 · MINIMAL PREVIEW</p></div>
+  <div id="appGate" class="gate-overlay">
+    <section class="gate-card">
+      <img src="app-logo-v20.png?v=260" alt="여우방 로고" class="gate-logo" />
+      <h1 id="gateTitle">접속 확인</h1>
+      <p id="gateMessage">설정을 불러오는 중입니다.</p>
+      <div id="gateForm" class="gate-form hidden">
+        <input id="gatePassword" type="password" inputmode="numeric" autocomplete="current-password" placeholder="비밀번호 입력" />
+        <button id="gateSubmitBtn" class="primary" type="button">확인</button>
+      </div>
+      <button id="gateAdminBtn" class="text-btn hidden" type="button">운영진 비밀번호로 열기</button>
+      <button id="gateRetryBtn" class="outline hidden" type="button">다시 시도</button>
+      <p id="gateError" class="error-text"></p>
+    </section>
   </div>
-  <button id="installBtn" class="install" type="button">⚙ 앱설치</button>
-</header>
 
-<main class="container">
-  <section id="noticeCard" class="notice-card hidden">
-    <div class="notice-head"><strong>📢 공지</strong><button id="closeNoticeBtn" type="button">닫기</button></div>
-    <div id="noticeList"></div>
-  </section>
-
-  <section id="followView" class="view active">
-    <section class="card">
-      <div class="section-title-row">
-        <div><h2>팔로우리스트</h2><p class="subtext">Google Sheets의 Sheet1 명단을 자동으로 불러옵니다.</p></div>
-        <button id="refreshFollowBtn" class="outline small" type="button">↻ 새로고침</button>
+  <header class="header">
+    <div class="brand">
+      <img class="brand-logo" src="app-logo-v20.png?v=260" alt="여우방 로고" />
+      <div class="brand-text">
+        <h1><span>여우방</span><span>팔로우리스트+맞팔확인</span></h1>
+        <p>V26 · FULL REALTIME</p>
       </div>
-      <div class="stats-grid compact">
-        <article><span>전체 인원</span><strong id="followTotal">0명</strong></article>
-        <article><span>전체 조</span><strong id="groupTotal">0조</strong></article>
-        <article><span>조별 인원</span><strong>500명</strong></article>
-        <article><span>마지막 갱신</span><strong id="lastRefresh">대기</strong></article>
-      </div>
-      <div class="search-wrap standalone"><span>⌕</span><input id="followSearch" type="search" placeholder="번호 · 닉네임 · 아이디 검색" /></div>
-      <div id="groupTabs" class="group-tabs"></div>
-      <p id="followState" class="state-text">명단을 불러오는 중입니다.</p>
-      <div class="follow-head"><span>번호</span><span>닉네임</span><span>아이디</span><span>바로가기</span></div>
-      <div id="followList" class="follow-list"></div>
-    </section>
-  </section>
-
-  <section id="matchView" class="view">
-
-    <section id="matchLockCard" class="card lock-card hidden">
-      <div class="lock-icon">🔒</div>
-      <h2>맞팔확인 잠금 중</h2>
-      <p>현재 운영진이 맞팔확인 기능을 잠가두었습니다.</p>
-      <p class="subtext">운영진에서 잠금을 해제한 뒤 이용할 수 있습니다.</p>
-    </section>
-    <div id="matchContent">
-    <section class="card start-card">
-      <div class="room-row">
-        <div class="room-info"><span>단톡방 명단</span><strong id="roomState">불러오는 중</strong></div>
-        <button id="reloadRoomBtn" class="outline small" type="button">↻ 새로고침</button>
-      </div>
-      <label class="file-input" for="zipFile"><span id="fileName">인스타그램 ZIP 파일 선택</span><input id="zipFile" type="file" accept=".zip,application/zip" /></label>
-      <button id="analyzeBtn" class="primary" type="button">맞팔 분석 시작 <span>→</span></button>
-      <p id="status" class="status">단톡방 명단을 불러온 뒤 ZIP 파일을 선택해 주세요.</p>
-    </section>
-
-    <section id="summarySection" class="card hidden">
-      <div class="section-title-row"><h2>분석 결과 요약</h2><button id="resetBtn" class="outline small" type="button">↻ 새로 분석</button></div>
-      <div class="summary-grid">
-        <article class="summary-box green"><span class="summary-icon">✓</span><span>맞팔 완료</span><strong id="mutualCount">0명</strong><small id="mutualRate">0%</small></article>
-        <article class="summary-box orange"><span class="summary-icon">♙</span><span>나만 팔로우 함</span><strong id="onlyMeCount">0명</strong><small id="onlyMeRate">0%</small></article>
-        <article class="summary-box blue"><span class="summary-icon">♙</span><span>상대가 팔로우만 함</span><strong id="fansOnlyCount">0명</strong><small id="fansOnlyRate">0%</small></article>
-        <article class="summary-box gray"><span class="summary-icon">♙</span><span>서로 팔로우 안 함</span><strong id="neitherCount">0명</strong><small id="neitherRate">0%</small></article>
-      </div>
-      <p id="rateText" class="rate"></p>
-    </section>
-
-    <section id="resultsSection" class="card hidden">
-      <div class="tools"><div class="search-wrap"><span>⌕</span><input id="searchInput" type="search" placeholder="아이디 또는 닉네임 검색" /></div><button id="copyBtn" class="outline" type="button">▣ 미맞팔 복사</button><button id="csvBtn" class="outline" type="button">⇩ CSV</button></div>
-      <div class="tabs"><button class="tab active" data-tab="all">전체 (<span id="tabAll">0</span>)</button><button class="tab" data-tab="mutual">맞팔 (<span id="tabMutual">0</span>)</button><button class="tab" data-tab="onlyMe">나만 팔로우 (<span id="tabOnlyMe">0</span>)</button><button class="tab" data-tab="fansOnly">상대만 팔로우 (<span id="tabFansOnly">0</span>)</button><button class="tab" data-tab="neither">서로 안 함 (<span id="tabNeither">0</span>)</button></div>
-      <div class="table-head"><span>번호</span><span>닉네임</span><span>아이디</span><span>상태</span><span>바로가기</span></div>
-      <div id="list" class="list"></div>
-    </section>
     </div>
-  </section>
+    <button id="installBtn" class="install" type="button">앱설치</button>
+  </header>
 
-  <section id="adminView" class="view">
-    <section class="card" id="adminLoginCard">
-      <h2>운영진 로그인</h2><p class="subtext">운영진 전용 기능입니다.</p>
-      <div class="admin-login"><input id="adminPassword" type="password" inputmode="numeric" placeholder="비밀번호 입력" /><button id="adminLoginBtn" class="primary small-primary" type="button">로그인</button></div>
-      <p id="adminLoginMsg" class="state-text"></p>
+  <main class="container">
+    <section id="noticeCard" class="notice-card hidden">
+      <div class="notice-head">
+        <strong>📢 공지</strong>
+        <button id="closeNoticeBtn" type="button">닫기</button>
+      </div>
+      <div id="noticeList"></div>
     </section>
-    <section id="adminPanel" class="card hidden">
-      <div class="section-title-row"><h2>운영진 기능</h2><button id="adminLogoutBtn" class="outline small" type="button">로그아웃</button></div>
-      <div class="admin-actions"><button id="openSheetBtn" class="outline" type="button">구글시트 열기</button><button id="adminRefreshBtn" class="outline" type="button">명단 새로고침</button></div>
-      <div class="stats-grid compact admin-stats"><article><span>전체 인원</span><strong id="adminTotal">0명</strong></article><article><span>전체 조</span><strong id="adminGroups">0조</strong></article><article><span>공지 수</span><strong id="adminNotices">0개</strong></article><article><span>명단 상태</span><strong id="adminSheetState">대기</strong></article></div>
 
-      <hr />
-      <div class="section-title-row">
-        <div>
-          <h3>맞팔확인 잠금 설정</h3>
-          <p class="subtext">이 기기에서 맞팔확인 메뉴 사용을 잠그거나 해제합니다.</p>
+    <section id="followView" class="view active">
+      <section class="card">
+        <div class="section-title-row">
+          <div>
+            <h2>팔로우리스트</h2>
+            <p class="subtext">Google Apps Script를 통해 Sheet1 명단을 불러옵니다.</p>
+          </div>
+          <button id="refreshFollowBtn" class="outline small" type="button">↻ 새로고침</button>
         </div>
-        <span id="matchLockState" class="lock-state unlocked">사용 가능</span>
-      </div>
-      <div class="admin-actions">
-        <button id="lockMatchBtn" class="outline danger-outline" type="button">🔒 맞팔확인 잠그기</button>
-        <button id="unlockMatchBtn" class="outline success-outline" type="button">🔓 맞팔확인 잠금 해제</button>
-      </div>
 
-      <hr />
-      <h3>공지 작성</h3>
-      <input id="noticeTitle" type="text" placeholder="공지 제목" />
-      <textarea id="noticeBody" placeholder="공지 내용을 입력하세요."></textarea>
-      <button id="saveNoticeBtn" class="primary" type="button">공지 저장</button>
-      <div id="adminNoticeList" class="admin-notice-list"></div>
+        <div class="stats-grid compact">
+          <article><span>전체 인원</span><strong id="followTotal">0명</strong></article>
+          <article><span>전체 조</span><strong id="groupTotal">0조</strong></article>
+          <article><span>조별 인원</span><strong>500명</strong></article>
+          <article><span>마지막 갱신</span><strong id="lastRefresh">대기</strong></article>
+        </div>
+
+        <div class="search-wrap standalone">
+          <span>⌕</span>
+          <input id="followSearch" type="search" placeholder="번호 · 닉네임 · 아이디 검색" />
+        </div>
+        <div id="groupTabs" class="group-tabs"></div>
+        <p id="followState" class="state-text">접속 비밀번호 확인 후 명단을 불러옵니다.</p>
+        <div class="follow-head"><span>번호</span><span>닉네임</span><span>아이디</span><span>바로가기</span></div>
+        <div id="followList" class="follow-list"></div>
+      </section>
     </section>
-  </section>
-</main>
-<footer><span>© 2026 YEOWOOBANG</span><span>Version 24.0</span></footer>
 
-<nav class="bottom-nav" aria-label="주요 메뉴">
-  <button class="nav-btn active" data-view="followView" type="button"><span class="nav-icon">☷</span><span>팔로우리스트</span></button>
-  <button class="nav-btn" data-view="matchView" type="button"><span class="nav-icon">↔</span><span>맞팔확인</span></button>
-  <button class="nav-btn" data-view="adminView" type="button"><span class="nav-icon">⚙</span><span>운영진</span></button>
-</nav>
-<div id="toast" class="toast"></div>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="app.js?v=240"></script>
-</body></html>
+    <section id="matchView" class="view">
+      <section id="matchLockCard" class="card lock-card hidden">
+        <div class="lock-icon">🔒</div>
+        <h2>맞팔확인 잠금 중</h2>
+        <p>맞팔확인 비밀번호를 입력해 주세요.</p>
+        <div class="inline-auth">
+          <input id="matchPassword" type="password" inputmode="numeric" placeholder="맞팔확인 비밀번호" />
+          <button id="matchUnlockBtn" class="primary small-primary" type="button">잠금 해제</button>
+        </div>
+        <p id="matchUnlockMsg" class="error-text"></p>
+      </section>
+
+      <div id="matchContent">
+        <section class="card start-card">
+          <div class="room-row">
+            <div class="room-info"><span>단톡방 명단</span><strong id="roomState">대기</strong></div>
+            <button id="reloadRoomBtn" class="outline small" type="button">↻ 새로고침</button>
+          </div>
+          <label class="file-input" for="zipFile">
+            <span id="fileName">인스타그램 ZIP 파일 선택</span>
+            <input id="zipFile" type="file" accept=".zip,application/zip" />
+          </label>
+          <button id="analyzeBtn" class="primary" type="button">맞팔 분석 시작 <span>→</span></button>
+          <p id="status" class="status">단톡방 명단을 불러온 뒤 ZIP 파일을 선택해 주세요.</p>
+        </section>
+
+        <section id="summarySection" class="card hidden">
+          <div class="section-title-row"><h2>분석 결과 요약</h2><button id="resetBtn" class="outline small" type="button">↻ 새로 분석</button></div>
+          <div class="summary-grid">
+            <article class="summary-box green"><span>맞팔 완료</span><strong id="mutualCount">0명</strong><small id="mutualRate">0%</small></article>
+            <article class="summary-box orange"><span>나만 팔로우 함</span><strong id="onlyMeCount">0명</strong><small id="onlyMeRate">0%</small></article>
+            <article class="summary-box blue"><span>상대가 팔로우만 함</span><strong id="fansOnlyCount">0명</strong><small id="fansOnlyRate">0%</small></article>
+            <article class="summary-box gray"><span>서로 팔로우 안 함</span><strong id="neitherCount">0명</strong><small id="neitherRate">0%</small></article>
+          </div>
+          <p id="rateText" class="rate"></p>
+        </section>
+
+        <section id="resultsSection" class="card hidden">
+          <div class="tools">
+            <div class="search-wrap"><span>⌕</span><input id="searchInput" type="search" placeholder="아이디 또는 닉네임 검색" /></div>
+            <button id="copyBtn" class="outline" type="button">미맞팔 복사</button>
+            <button id="csvBtn" class="outline" type="button">CSV</button>
+          </div>
+          <div class="tabs">
+            <button class="tab active" data-tab="all">전체 (<span id="tabAll">0</span>)</button>
+            <button class="tab" data-tab="mutual">맞팔 (<span id="tabMutual">0</span>)</button>
+            <button class="tab" data-tab="onlyMe">나만 팔로우 (<span id="tabOnlyMe">0</span>)</button>
+            <button class="tab" data-tab="fansOnly">상대만 팔로우 (<span id="tabFansOnly">0</span>)</button>
+            <button class="tab" data-tab="neither">서로 안 함 (<span id="tabNeither">0</span>)</button>
+          </div>
+          <div class="table-head"><span>번호</span><span>닉네임</span><span>아이디</span><span>상태</span><span>바로가기</span></div>
+          <div id="list" class="list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="adminView" class="view">
+      <section class="card" id="adminLoginCard">
+        <h2>운영진 로그인</h2>
+        <p class="subtext">Google Apps Script에 저장된 운영진 비밀번호를 확인합니다.</p>
+        <div class="admin-login">
+          <input id="adminPassword" type="password" inputmode="numeric" placeholder="운영진 비밀번호" />
+          <button id="adminLoginBtn" class="primary small-primary" type="button">로그인</button>
+        </div>
+        <p id="adminLoginMsg" class="error-text"></p>
+      </section>
+
+      <section id="adminPanel" class="card hidden">
+        <div class="section-title-row">
+          <div>
+            <h2>운영진 기능</h2>
+            <p id="apiState" class="subtext">실시간 설정 연결됨</p>
+          </div>
+          <button id="adminLogoutBtn" class="outline small" type="button">로그아웃</button>
+        </div>
+
+        <div class="admin-actions">
+          <button id="openSheetBtn" class="outline" type="button">구글시트 열기</button>
+          <button id="adminRefreshBtn" class="outline" type="button">전체 새로고침</button>
+        </div>
+
+        <div class="stats-grid compact admin-stats">
+          <article><span>전체 인원</span><strong id="adminTotal">0명</strong></article>
+          <article><span>전체 조</span><strong id="adminGroups">0조</strong></article>
+          <article><span>공지 수</span><strong id="adminNotices">0개</strong></article>
+          <article><span>API 상태</span><strong id="adminApiState">대기</strong></article>
+        </div>
+
+        <hr />
+        <div class="setting-block">
+          <div class="section-title-row">
+            <div><h3>앱 전체 잠금</h3><p class="subtext">TRUE일 때 일반 사용자의 앱 전체 접속을 제한합니다.</p></div>
+            <span id="appLockState" class="lock-state unlocked">사용 가능</span>
+          </div>
+          <div class="admin-actions">
+            <button id="lockAppBtn" class="outline danger-outline" type="button">앱 잠그기</button>
+            <button id="unlockAppBtn" class="outline success-outline" type="button">앱 잠금 해제</button>
+          </div>
+          <div class="setting-row">
+            <input id="newAppLockPassword" type="password" inputmode="numeric" placeholder="새 앱잠금 비밀번호" />
+            <button id="changeAppLockPasswordBtn" class="outline" type="button">앱잠금 비밀번호 변경</button>
+          </div>
+        </div>
+
+        <hr />
+        <div class="setting-block">
+          <h3>접속 비밀번호</h3>
+          <p class="subtext">링크 접속 시 입력하는 비밀번호입니다.</p>
+          <div class="setting-row">
+            <input id="newAccessPassword" type="password" inputmode="numeric" placeholder="새 접속 비밀번호" />
+            <button id="changeAccessPasswordBtn" class="outline" type="button">접속 비밀번호 변경</button>
+          </div>
+        </div>
+
+        <hr />
+        <div class="setting-block">
+          <div class="section-title-row">
+            <div><h3>맞팔확인 잠금</h3><p class="subtext">맞팔확인 메뉴만 별도 비밀번호로 잠급니다.</p></div>
+            <span id="matchLockState" class="lock-state unlocked">사용 가능</span>
+          </div>
+          <div class="admin-actions">
+            <button id="lockMatchBtn" class="outline danger-outline" type="button">맞팔확인 잠그기</button>
+            <button id="unlockMatchBtn" class="outline success-outline" type="button">맞팔확인 잠금 해제</button>
+          </div>
+          <div class="setting-row">
+            <input id="newMatchPassword" type="password" inputmode="numeric" placeholder="새 맞팔확인 비밀번호" />
+            <button id="changeMatchPasswordBtn" class="outline" type="button">맞팔 비밀번호 변경</button>
+          </div>
+        </div>
+
+        <hr />
+        <div class="setting-block">
+          <h3>공지 작성</h3>
+          <textarea id="noticeBody" placeholder="공지 내용을 입력하세요."></textarea>
+          <button id="saveNoticeBtn" class="primary" type="button">공지 저장</button>
+          <div id="adminNoticeList" class="admin-notice-list"></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer><span>© 2026 YEOWOOBANG</span><span>Version 26.0</span></footer>
+
+  <nav class="bottom-nav" aria-label="주요 메뉴">
+    <button class="nav-btn active" data-view="followView" type="button"><span class="nav-icon">☷</span><span>팔로우리스트</span></button>
+    <button class="nav-btn" data-view="matchView" type="button"><span class="nav-icon">↔</span><span>맞팔확인</span></button>
+    <button class="nav-btn" data-view="adminView" type="button"><span class="nav-icon">⚙</span><span>운영진</span></button>
+  </nav>
+
+  <div id="toast" class="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="app.js?v=260"></script>
+</body>
+</html>

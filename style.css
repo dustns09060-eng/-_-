@@ -146,3 +146,62 @@ body{padding-bottom:env(safe-area-inset-bottom)}
   .brand-text h1 span:last-child{font-size:11.5px}
   .brand-logo{width:41px;height:41px}
 }
+
+
+/* V26 Apps Script 실시간 인증 */
+body.gate-open{overflow:hidden}
+.gate-overlay{
+  position:fixed;inset:0;z-index:999;
+  display:grid;place-items:center;
+  padding:20px;
+  background:rgba(247,248,250,.98);
+  backdrop-filter:blur(8px);
+}
+.gate-card{
+  width:min(420px,100%);
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:24px;
+  padding:28px;
+  text-align:center;
+  box-shadow:0 20px 60px rgba(20,28,40,.13);
+}
+.gate-logo{
+  width:92px;height:92px;
+  border-radius:50%;
+  object-fit:cover;
+  border:1px solid #f2ddcc;
+}
+.gate-card h1{margin:16px 0 8px;font-size:24px}
+.gate-card p{color:var(--muted);line-height:1.55}
+.gate-form{display:grid;gap:10px;margin-top:18px}
+.gate-form input,.inline-auth input,.setting-row input{
+  width:100%;border:1px solid #d9dde3;border-radius:12px;
+  padding:14px;font:inherit;outline:none;
+}
+.gate-form input:focus,.inline-auth input:focus,.setting-row input:focus{
+  border-color:var(--orange);
+  box-shadow:0 0 0 3px rgba(255,101,0,.1);
+}
+.text-btn{
+  border:0;background:transparent;color:var(--orange);
+  font-weight:900;padding:13px;margin-top:5px;
+}
+.error-text{color:#d53b3b!important;font-size:13px;min-height:18px}
+.inline-auth{
+  max-width:480px;margin:18px auto 0;
+  display:flex;gap:10px;
+}
+.setting-block{padding:2px 0}
+.setting-row{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;margin-top:12px;
+}
+.setting-row .outline{white-space:nowrap}
+#apiState{margin:3px 0 0}
+@media(max-width:600px){
+  .gate-card{padding:23px 18px;border-radius:20px}
+  .gate-logo{width:80px;height:80px}
+  .inline-auth,.setting-row{grid-template-columns:1fr;display:grid}
+  .inline-auth .small-primary,.setting-row .outline{width:100%}
+}
