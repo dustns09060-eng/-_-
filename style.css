@@ -251,3 +251,9 @@ body.gate-open{overflow:hidden}
   .access-role{min-height:92px;flex-direction:row}
   .simple-stats{overflow:auto}
 }
+
+/* V29 첫 화면 */
+.access-card #gateMessage.hidden{display:none!important}
+.access-role strong{font-size:20px}
+.access-role.general{background:linear-gradient(180deg,#fffaf6 0%,#fff6ee 100%);border-color:#ffd1ae}
+.access-role.admin{background:#fff}

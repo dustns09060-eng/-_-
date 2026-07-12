@@ -14,10 +14,10 @@ let matchGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V28";
+const APP_VERSION = "V29";
 
 let config = {
-  version: "V28 MINIMAL ACCESS",
+  version: "V29 ENTRY LABELS",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -136,15 +136,15 @@ function setGate(mode, message = "") {
     text.textContent = message || "설정을 불러오는 중입니다.";
   } else if (mode === "role") {
     title.textContent = "여우방";
-    text.textContent = "접속 방법을 선택해 주세요.";
+    text.textContent = "";
     roles.classList.remove("hidden");
   } else if (mode === "access") {
-    title.textContent = "일반 접속";
+    title.textContent = "이용하기";
     text.textContent = "";
     password.placeholder = "접속 비밀번호";
     form.classList.remove("hidden");
   } else if (mode === "admin") {
-    title.textContent = "운영진 접속";
+    title.textContent = "운영진";
     text.textContent = "";
     password.placeholder = "운영진 비밀번호";
     form.classList.remove("hidden");
@@ -929,7 +929,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=280").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=290").catch(() => {});
   }
 
   setInterval(async () => {
