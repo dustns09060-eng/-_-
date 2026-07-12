@@ -12,9 +12,12 @@ let accessGranted = false;
 let appLockGranted = false;
 let matchGranted = false;
 let gateMode = "loading";
+let securityVersion = "";
+let noticeSignature = "";
+const APP_VERSION = "V27";
 
 let config = {
-  version: "V26 FULL REALTIME",
+  version: "V27 SMART SYNC",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -238,27 +241,37 @@ async function openWithAdminPassword() {
 }
 
 async function loadAfterAuth() {
-  await Promise.allSettled([loadRoomList(false), loadNotices(), refreshPublicConfig(false)]);
+  await Promise.allSettled([loadRoomList(false), loadNotices(false), refreshPublicConfig(false)]);
+  securityVersion = publicConfig?.securityVersion || "";
+  checkVersionUpdate();
 }
 
 async function refreshPublicConfig(recheck = true) {
-  const previousUpdatedAt = publicConfig?.updatedAt || "";
+  const previousSecurity = securityVersion || publicConfig?.securityVersion || "";
   publicConfig = await apiGet("publicConfig");
   updateLockIndicators();
   applyMatchLock();
+  checkVersionUpdate();
 
-  if (
-    recheck &&
-    previousUpdatedAt &&
-    publicConfig.updatedAt &&
-    previousUpdatedAt !== publicConfig.updatedAt &&
-    !adminLoggedIn
-  ) {
+  const nextSecurity = publicConfig?.securityVersion || "";
+  if (recheck && previousSecurity && nextSecurity && previousSecurity !== nextSecurity && !adminLoggedIn) {
+    securityVersion = nextSecurity;
     accessGranted = false;
     appLockGranted = false;
     matchGranted = false;
+    toast("보안 설정이 변경되어 다시 로그인합니다.");
     await bootstrapAuth();
+    return;
   }
+  securityVersion = nextSecurity;
+}
+
+function checkVersionUpdate() {
+  if (!publicConfig?.forceUpdate) return;
+  const serverVersion = String(publicConfig.version || "").trim().toUpperCase();
+  if (!serverVersion || serverVersion === APP_VERSION) return;
+  $("updateMessage").textContent = `현재 ${APP_VERSION} · 최신 ${serverVersion}`;
+  $("updateOverlay").classList.remove("hidden");
 }
 
 function updateLockIndicators() {
@@ -688,10 +701,17 @@ function resetAnalysis() {
   $("resultsSection").classList.add("hidden");
 }
 
-async function loadNotices() {
+async function loadNotices(notify = true) {
   try {
     const data = await apiGet("notices");
-    renderNotices(data.notices || []);
+    const notices = data.notices || [];
+    const nextSignature = JSON.stringify(notices.map(item => [item.noticeId, item.createdAt, item.content]));
+    if (notify && noticeSignature && nextSignature !== noticeSignature && notices.length) {
+      $("noticeCard").classList.remove("hidden");
+      toast("새 공지가 등록되었습니다.");
+    }
+    noticeSignature = nextSignature;
+    renderNotices(notices);
   } catch (_) {
     renderNotices([]);
   }
@@ -721,6 +741,19 @@ function renderNotices(notices) {
   });
 }
 
+async function loadAdminLogs() {
+  if (!adminLoggedIn || !adminPasswordValue) return;
+  try {
+    const data = await apiPost("getAdminLogs", { adminPassword: adminPasswordValue });
+    const logs = data.logs || [];
+    $("adminLogList").innerHTML = logs.length
+      ? logs.map(log => `<div class="log-row"><strong>${escapeHtml(log.createdAt)}</strong><span>${escapeHtml(log.action)}</span><small>${escapeHtml(log.detail)}</small></div>`).join("")
+      : '<p class="state-text">저장된 로그가 없습니다.</p>';
+  } catch (error) {
+    $("adminLogList").innerHTML = `<p class="error-text">${escapeHtml(error.message)}</p>`;
+  }
+}
+
 async function adminLogin() {
   const password = $("adminPassword").value.trim();
   if (!password) return;
@@ -731,6 +764,7 @@ async function adminLogin() {
     adminPasswordValue = password;
     $("adminLoginMsg").textContent = "";
     showAdminPanel();
+    loadAdminLogs();
     matchGranted = true;
     applyMatchLock();
     toast("운영진 로그인 완료");
@@ -763,7 +797,7 @@ async function runAdminAction(action, payload, successMessage) {
   try {
     const data = await apiPost(action, { adminPassword: adminPasswordValue, ...payload });
     toast(successMessage);
-    await Promise.allSettled([refreshPublicConfig(false), loadNotices()]);
+    await Promise.allSettled([refreshPublicConfig(false), loadNotices(false), loadAdminLogs()]);
     return data;
   } catch (error) {
     toast(error.message || "변경 실패");
@@ -828,7 +862,7 @@ $("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogi
 $("adminLogoutBtn").onclick = adminLogout;
 $("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
 $("adminRefreshBtn").onclick = async () => {
-  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices()]);
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
   toast("전체 새로고침 완료");
 };
 
@@ -843,6 +877,16 @@ $("changeMatchPasswordBtn").onclick = () => changePassword("changeMatchPassword"
 
 $("saveNoticeBtn").onclick = saveNotice;
 $("closeNoticeBtn").onclick = () => $("noticeCard").classList.add("hidden");
+$("refreshLogsBtn").onclick = loadAdminLogs;
+$("updateNowBtn").onclick = async () => {
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(reg => reg.update().catch(() => {})));
+  }
+  const url = new URL(location.href);
+  url.searchParams.set("v", Date.now().toString());
+  location.replace(url.toString());
+};
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
@@ -864,12 +908,18 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=260").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=270").catch(() => {});
   }
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
       try { await refreshPublicConfig(true); } catch (_) {}
+    }
+  }, 30000);
+
+  setInterval(async () => {
+    if (!document.hidden && accessGranted) {
+      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
     }
   }, 60000);
 });
