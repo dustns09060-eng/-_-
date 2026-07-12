@@ -14,10 +14,10 @@ let matchGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V31";
+const APP_VERSION = "V32";
 
 let config = {
-  version: "V31 ONE LINE",
+  version: "V32 POLISHED UI",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -501,7 +501,7 @@ function renderFollowList() {
         <span class="follow-no">${escapeHtml(item.no)}</span>
         <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
         <a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">@${escapeHtml(item.id)}</a>
-        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">열기 →</a>
+        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
       </div>`).join("")
     : '<div class="empty-state">검색 결과가 없습니다.</div>';
 }
@@ -676,7 +676,7 @@ function renderMatchList() {
           <a class="id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>
         </div>
         <span class="badge ${item.status}">${statusLabel(item.status)}</span>
-        <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">열기 →</a>
+        <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
       </div>`).join("")
     : '<div class="empty-state">결과가 없습니다.</div>';
 }
@@ -939,7 +939,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=310").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
   }
 
   setInterval(async () => {

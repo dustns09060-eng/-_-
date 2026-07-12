@@ -377,3 +377,125 @@ body.gate-open{overflow:hidden}
     font-size:13px;
   }
 }
+
+
+/* V32 정돈된 UI */
+.header{
+  padding-top:12px;
+  padding-bottom:12px;
+}
+
+.brand-text h1{
+  font-size:21px!important;
+  line-height:1.1;
+  letter-spacing:-.4px;
+}
+
+.brand-text p{
+  display:none!important;
+}
+
+.follow-tools-sticky{
+  position:sticky;
+  top:77px;
+  z-index:20;
+  margin:0 -4px 10px;
+  padding:8px 4px 2px;
+  background:rgba(255,255,255,.96);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(230,232,235,.8);
+}
+
+.follow-tools-sticky .standalone{
+  max-width:none;
+  margin:0 0 8px;
+}
+
+.follow-tools-sticky .group-tabs{
+  padding-bottom:8px;
+}
+
+.follow-item{
+  border-radius:12px;
+  margin:5px 0;
+  border:1px solid #eef0f2;
+  background:#fff;
+}
+
+.follow-item:hover{
+  background:#fffaf6;
+}
+
+.follow-name{
+  color:#1a1a1a;
+  font-weight:900;
+}
+
+.follow-id{
+  color:#555f6d!important;
+}
+
+.insta-btn,
+.insta{
+  background:#fff5ed;
+  color:#e95800;
+  border:1px solid #ffd7bd;
+  font-weight:900;
+}
+
+.insta-btn:hover,
+.insta:hover{
+  background:#ffeadc;
+}
+
+#adminPanel .setting-block{
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:16px;
+  margin-top:14px;
+  background:#fff;
+}
+
+#adminPanel hr{
+  display:none;
+}
+
+#adminPanel .admin-actions{
+  margin-bottom:0;
+}
+
+#adminPanel textarea{
+  background:#fafbfc;
+}
+
+#adminPanel .primary{
+  margin-top:4px;
+}
+
+.bottom-nav{
+  box-shadow:0 -8px 24px rgba(20,28,40,.08);
+}
+
+.bottom-nav .nav-btn{
+  transition:background .15s ease,color .15s ease,transform .15s ease;
+}
+
+.bottom-nav .nav-btn:active{
+  transform:scale(.96);
+}
+
+@media(max-width:760px){
+  .follow-tools-sticky{
+    top:68px;
+    margin-left:-2px;
+    margin-right:-2px;
+  }
+
+  .brand-text h1{
+    font-size:19px!important;
+  }
+
+  #adminPanel .setting-block{
+    padding:14px;
+  }
+}
