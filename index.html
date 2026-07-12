@@ -8,48 +8,60 @@
   <meta name="apple-mobile-web-app-title" content="여우방 팔로우리스트+맞팔확인" />
   <meta name="description" content="" />
   <title>여우방 팔로우리스트+맞팔확인</title>
-  <link rel="canonical" href="https://dustns09060-eng.github.io/-_-/?v=270" />
-  <link rel="manifest" href="manifest.json?v=270" />
-  <link rel="icon" href="favicon-v20.png?v=270" type="image/png" />
-  <link rel="apple-touch-icon" href="icon-192-v20.png?v=270" />
-  <link rel="stylesheet" href="style.css?v=270" />
+  <link rel="canonical" href="https://dustns09060-eng.github.io/-_-/?v=280" />
+  <link rel="manifest" href="manifest.json?v=280" />
+  <link rel="icon" href="favicon-v20.png?v=280" type="image/png" />
+  <link rel="apple-touch-icon" href="icon-192-v20.png?v=280" />
+  <link rel="stylesheet" href="style.css?v=280" />
 
   <meta property="og:locale" content="ko_KR" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="여우방 팔로우리스트+맞팔확인" />
   <meta property="og:title" content="여우방 팔로우리스트+맞팔확인" />
   <meta property="og:description" content="" />
-  <meta property="og:url" content="https://dustns09060-eng.github.io/-_-/?v=270" />
-  <meta property="og:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=270" />
-  <meta property="og:image:secure_url" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=270" />
+  <meta property="og:url" content="https://dustns09060-eng.github.io/-_-/?v=280" />
+  <meta property="og:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=280" />
+  <meta property="og:image:secure_url" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=280" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="여우방 팔로우리스트+맞팔확인" />
   <meta name="twitter:description" content="" />
-  <meta name="twitter:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=270" />
+  <meta name="twitter:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=280" />
 </head>
 <body>
   <div id="appGate" class="gate-overlay">
-    <section class="gate-card">
-      <img src="app-logo-v20.png?v=270" alt="여우방 로고" class="gate-logo" />
-      <h1 id="gateTitle">접속 확인</h1>
-      <p id="gateMessage">설정을 불러오는 중입니다.</p>
+    <section class="gate-card access-card">
+      <img src="app-logo-v20.png?v=280" alt="여우방 로고" class="gate-logo" />
+      <h1 id="gateTitle">여우방</h1>
+      <p id="gateMessage">접속 방법을 선택해 주세요.</p>
+
+      <div id="gateRoleSelect" class="access-role-grid">
+        <button id="generalAccessBtn" class="access-role general" type="button">
+          <span class="role-icon">👤</span>
+          <strong>일반 접속</strong>
+        </button>
+        <button id="adminAccessBtn" class="access-role admin" type="button">
+          <span class="role-icon">⚙</span>
+          <strong>운영진 접속</strong>
+        </button>
+      </div>
+
       <div id="gateForm" class="gate-form hidden">
         <input id="gatePassword" type="password" inputmode="numeric" autocomplete="current-password" placeholder="비밀번호 입력" />
-        <button id="gateSubmitBtn" class="primary" type="button">확인</button>
+        <button id="gateSubmitBtn" class="primary" type="button">입장하기</button>
+        <button id="gateBackBtn" class="text-btn" type="button">뒤로</button>
       </div>
-      <button id="gateAdminBtn" class="text-btn hidden" type="button">운영진 비밀번호로 열기</button>
+
       <button id="gateRetryBtn" class="outline hidden" type="button">다시 시도</button>
       <p id="gateError" class="error-text"></p>
     </section>
   </div>
 
-
   <div id="updateOverlay" class="gate-overlay hidden">
     <section class="gate-card">
-      <img src="app-logo-v20.png?v=270" alt="여우방 로고" class="gate-logo" />
+      <img src="app-logo-v20.png?v=280" alt="여우방 로고" class="gate-logo" />
       <h1>새 버전이 있습니다</h1>
       <p id="updateMessage">앱을 최신 버전으로 업데이트해 주세요.</p>
       <button id="updateNowBtn" class="primary" type="button">지금 업데이트</button>
@@ -58,10 +70,10 @@
 
   <header class="header">
     <div class="brand">
-      <img class="brand-logo" src="app-logo-v20.png?v=270" alt="여우방 로고" />
+      <img class="brand-logo" src="app-logo-v20.png?v=280" alt="여우방 로고" />
       <div class="brand-text">
         <h1><span>여우방</span><span>팔로우리스트+맞팔확인</span></h1>
-        <p>V27 · SMART SYNC</p>
+        <p>V28 · MINIMAL ACCESS</p>
       </div>
     </div>
     <button id="installBtn" class="install" type="button">앱설치</button>
@@ -81,17 +93,15 @@
         <div class="section-title-row">
           <div>
             <h2>팔로우리스트</h2>
-            <p class="subtext">Google Apps Script를 통해 Sheet1 명단을 불러옵니다.</p>
           </div>
-          <button id="refreshFollowBtn" class="outline small" type="button">↻ 새로고침</button>
+          <button id="refreshFollowBtn" class="icon-btn" type="button" aria-label="명단 새로고침" title="명단 새로고침">↻</button>
         </div>
 
-        <div class="stats-grid compact">
-          <article><span>전체 인원</span><strong id="followTotal">0명</strong></article>
-          <article><span>전체 조</span><strong id="groupTotal">0조</strong></article>
-          <article><span>조별 인원</span><strong>500명</strong></article>
-          <article><span>마지막 갱신</span><strong id="lastRefresh">대기</strong></article>
+        <div class="simple-stats">
+          <article><span>👥</span><strong id="followTotal">0명</strong></article>
+          <article><span>▦</span><strong id="groupTotal">0조</strong></article>
         </div>
+        <span id="lastRefresh" class="hidden">대기</span>
 
         <div class="search-wrap standalone">
           <span>⌕</span>
@@ -120,7 +130,7 @@
         <section class="card start-card">
           <div class="room-row">
             <div class="room-info"><span>단톡방 명단</span><strong id="roomState">대기</strong></div>
-            <button id="reloadRoomBtn" class="outline small" type="button">↻ 새로고침</button>
+            <button id="reloadRoomBtn" class="icon-btn" type="button" aria-label="명단 새로고침" title="명단 새로고침">↻</button>
           </div>
           <label class="file-input" for="zipFile">
             <span id="fileName">인스타그램 ZIP 파일 선택</span>
@@ -131,7 +141,7 @@
         </section>
 
         <section id="summarySection" class="card hidden">
-          <div class="section-title-row"><h2>분석 결과 요약</h2><button id="resetBtn" class="outline small" type="button">↻ 새로 분석</button></div>
+          <div class="section-title-row"><h2>분석 결과 요약</h2><button id="resetBtn" class="icon-btn" type="button" aria-label="새로 분석" title="새로 분석">↻</button></div>
           <div class="summary-grid">
             <article class="summary-box green"><span>맞팔 완료</span><strong id="mutualCount">0명</strong><small id="mutualRate">0%</small></article>
             <article class="summary-box orange"><span>나만 팔로우 함</span><strong id="onlyMeCount">0명</strong><small id="onlyMeRate">0%</small></article>
@@ -163,7 +173,6 @@
     <section id="adminView" class="view">
       <section class="card" id="adminLoginCard">
         <h2>운영진 로그인</h2>
-        <p class="subtext">Google Apps Script에 저장된 운영진 비밀번호를 확인합니다.</p>
         <div class="admin-login">
           <input id="adminPassword" type="password" inputmode="numeric" placeholder="운영진 비밀번호" />
           <button id="adminLoginBtn" class="primary small-primary" type="button">로그인</button>
@@ -175,7 +184,6 @@
         <div class="section-title-row">
           <div>
             <h2>운영진 기능</h2>
-            <p id="apiState" class="subtext">실시간 설정 연결됨</p>
           </div>
           <button id="adminLogoutBtn" class="outline small" type="button">로그아웃</button>
         </div>
@@ -195,23 +203,19 @@
         <hr />
         <div class="setting-block">
           <div class="section-title-row">
-            <div><h3>앱 전체 잠금</h3><p class="subtext">TRUE일 때 일반 사용자의 앱 전체 접속을 제한합니다.</p></div>
+            <div><h3>앱 전체 잠금</h3></div>
             <span id="appLockState" class="lock-state unlocked">사용 가능</span>
           </div>
           <div class="admin-actions">
             <button id="lockAppBtn" class="outline danger-outline" type="button">앱 잠그기</button>
             <button id="unlockAppBtn" class="outline success-outline" type="button">앱 잠금 해제</button>
           </div>
-          <div class="setting-row">
-            <input id="newAppLockPassword" type="password" inputmode="numeric" placeholder="새 앱잠금 비밀번호" />
-            <button id="changeAppLockPasswordBtn" class="outline" type="button">앱잠금 비밀번호 변경</button>
-          </div>
         </div>
 
         <hr />
         <div class="setting-block">
           <h3>접속 비밀번호</h3>
-          <p class="subtext">링크 접속 시 입력하는 비밀번호입니다.</p>
+          
           <div class="setting-row">
             <input id="newAccessPassword" type="password" inputmode="numeric" placeholder="새 접속 비밀번호" />
             <button id="changeAccessPasswordBtn" class="outline" type="button">접속 비밀번호 변경</button>
@@ -221,7 +225,7 @@
         <hr />
         <div class="setting-block">
           <div class="section-title-row">
-            <div><h3>맞팔확인 잠금</h3><p class="subtext">맞팔확인 메뉴만 별도 비밀번호로 잠급니다.</p></div>
+            <div><h3>맞팔확인 잠금</h3></div>
             <span id="matchLockState" class="lock-state unlocked">사용 가능</span>
           </div>
           <div class="admin-actions">
@@ -254,16 +258,16 @@
     </section>
   </main>
 
-  <footer><span>© 2026 YEOWOOBANG</span><span>Version 27.0</span></footer>
+  <footer><span>© 2026 YEOWOOBANG</span><span>Version 28.0</span></footer>
 
   <nav class="bottom-nav" aria-label="주요 메뉴">
     <button class="nav-btn active" data-view="followView" type="button"><span class="nav-icon">☷</span><span>팔로우리스트</span></button>
     <button class="nav-btn" data-view="matchView" type="button"><span class="nav-icon">↔</span><span>맞팔확인</span></button>
-    <button class="nav-btn" data-view="adminView" type="button"><span class="nav-icon">⚙</span><span>운영진</span></button>
+    <button id="adminNavBtn" class="nav-btn hidden" data-view="adminView" type="button"><span class="nav-icon">⚙</span><span>운영진</span></button>
   </nav>
 
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="app.js?v=270"></script>
+  <script src="app.js?v=280"></script>
 </body>
 </html>

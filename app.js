@@ -14,10 +14,10 @@ let matchGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V27";
+const APP_VERSION = "V28";
 
 let config = {
-  version: "V27 SMART SYNC",
+  version: "V28 MINIMAL ACCESS",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -120,35 +120,49 @@ function setGate(mode, message = "") {
   gateMode = mode;
   const title = $("gateTitle");
   const text = $("gateMessage");
+  const roles = $("gateRoleSelect");
   const form = $("gateForm");
-  const adminBtn = $("gateAdminBtn");
   const retryBtn = $("gateRetryBtn");
   const password = $("gatePassword");
 
   $("gateError").textContent = "";
+  roles.classList.add("hidden");
   form.classList.add("hidden");
-  adminBtn.classList.add("hidden");
   retryBtn.classList.add("hidden");
   password.value = "";
 
   if (mode === "loading") {
     title.textContent = "접속 확인";
     text.textContent = message || "설정을 불러오는 중입니다.";
-  } else if (mode === "appLock") {
-    title.textContent = "앱 잠금 중";
-    text.textContent = "앱잠금 비밀번호를 입력해 주세요.";
-    password.placeholder = "앱잠금 비밀번호";
-    form.classList.remove("hidden");
-    adminBtn.classList.remove("hidden");
+  } else if (mode === "role") {
+    title.textContent = "여우방";
+    text.textContent = "접속 방법을 선택해 주세요.";
+    roles.classList.remove("hidden");
   } else if (mode === "access") {
-    title.textContent = "접속 비밀번호";
-    text.textContent = "여우방 이용 비밀번호를 입력해 주세요.";
+    title.textContent = "일반 접속";
+    text.textContent = "";
     password.placeholder = "접속 비밀번호";
     form.classList.remove("hidden");
+  } else if (mode === "admin") {
+    title.textContent = "운영진 접속";
+    text.textContent = "";
+    password.placeholder = "운영진 비밀번호";
+    form.classList.remove("hidden");
+  } else if (mode === "blocked") {
+    title.textContent = "앱 잠금 중";
+    text.textContent = "현재 일반 접속이 잠겨 있습니다.";
+    form.classList.remove("hidden");
+    password.classList.add("hidden");
+    $("gateSubmitBtn").classList.add("hidden");
   } else if (mode === "error") {
     title.textContent = "연결 확인 필요";
-    text.textContent = message || "Google Apps Script 연결에 실패했습니다.";
+    text.textContent = message || "연결에 실패했습니다.";
     retryBtn.classList.remove("hidden");
+  }
+
+  if (mode !== "blocked") {
+    password.classList.remove("hidden");
+    $("gateSubmitBtn").classList.remove("hidden");
   }
 }
 
@@ -162,6 +176,10 @@ function hideGate() {
   document.body.classList.remove("gate-open");
 }
 
+function setAdminNavigation(enabled) {
+  $("adminNavBtn")?.classList.toggle("hidden", !enabled);
+}
+
 async function bootstrapAuth() {
   showGate();
   setGate("loading");
@@ -169,22 +187,26 @@ async function bootstrapAuth() {
   try {
     publicConfig = await apiGet("publicConfig");
     updateLockIndicators();
-
-    if (publicConfig.appLocked && !appLockGranted) {
-      setGate("appLock");
-      return;
-    }
-
-    if (!accessGranted) {
-      setGate("access");
-      return;
-    }
-
-    hideGate();
-    await loadAfterAuth();
+    setGate("role");
   } catch (error) {
     setGate("error", `설정을 불러오지 못했습니다. ${error.message}`);
   }
+}
+
+function chooseGeneralAccess() {
+  if (publicConfig?.appLocked) {
+    setGate("blocked");
+    return;
+  }
+  setGate("access");
+}
+
+function chooseAdminAccess() {
+  setGate("admin");
+}
+
+function backToRoleSelect() {
+  setGate("role");
 }
 
 async function submitGatePassword() {
@@ -197,46 +219,39 @@ async function submitGatePassword() {
   try {
     $("gateSubmitBtn").disabled = true;
 
-    if (gateMode === "appLock") {
-      await apiPost("verifyAppLockPassword", { password });
-      appLockGranted = true;
-      setGate("access");
-      return;
-    }
-
     if (gateMode === "access") {
       await apiPost("verifyAccessPassword", { password });
       accessGranted = true;
+      adminLoggedIn = false;
+      adminPasswordValue = "";
+      setAdminNavigation(false);
+      hideGate();
+      showView("followView");
+      await loadAfterAuth();
+      return;
+    }
+
+    if (gateMode === "admin") {
+      await apiPost("adminLogin", { password });
+      adminLoggedIn = true;
+      adminPasswordValue = password;
+      accessGranted = true;
+      matchGranted = true;
+      setAdminNavigation(true);
       hideGate();
       await loadAfterAuth();
+      showView("adminView");
+      showAdminPanel();
+      loadAdminLogs();
+      toast("운영진으로 접속했습니다.");
     }
   } catch (error) {
-    $("gateError").textContent = "비밀번호가 올바르지 않습니다.";
+    $("gateError").textContent =
+      gateMode === "admin"
+        ? "운영진 비밀번호가 올바르지 않습니다."
+        : "접속 비밀번호가 올바르지 않습니다.";
   } finally {
     $("gateSubmitBtn").disabled = false;
-  }
-}
-
-async function openWithAdminPassword() {
-  const password = $("gatePassword").value.trim();
-  if (!password) {
-    $("gateError").textContent = "운영진 비밀번호를 입력해 주세요.";
-    return;
-  }
-
-  try {
-    await apiPost("adminLogin", { password });
-    adminLoggedIn = true;
-    adminPasswordValue = password;
-    accessGranted = true;
-    appLockGranted = true;
-    hideGate();
-    await loadAfterAuth();
-    showView("adminView");
-    showAdminPanel();
-    toast("운영진으로 접속했습니다.");
-  } catch (_) {
-    $("gateError").textContent = "운영진 비밀번호가 올바르지 않습니다.";
   }
 }
 
@@ -260,6 +275,7 @@ async function refreshPublicConfig(recheck = true) {
     appLockGranted = false;
     matchGranted = false;
     toast("보안 설정이 변경되어 다시 로그인합니다.");
+    setAdminNavigation(false);
     await bootstrapAuth();
     return;
   }
@@ -782,10 +798,14 @@ function showAdminPanel() {
 function adminLogout() {
   adminLoggedIn = false;
   adminPasswordValue = "";
+  accessGranted = false;
+  matchGranted = false;
   $("adminPanel").classList.add("hidden");
   $("adminLoginCard").classList.remove("hidden");
   $("adminPassword").value = "";
+  setAdminNavigation(false);
   applyMatchLock();
+  bootstrapAuth();
 }
 
 async function runAdminAction(action, payload, successMessage) {
@@ -833,9 +853,11 @@ document.querySelectorAll(".nav-btn").forEach((button) => {
   button.onclick = () => showView(button.dataset.view);
 });
 
+$("generalAccessBtn").onclick = chooseGeneralAccess;
+$("adminAccessBtn").onclick = chooseAdminAccess;
+$("gateBackBtn").onclick = backToRoleSelect;
 $("gateSubmitBtn").onclick = submitGatePassword;
 $("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGatePassword(); };
-$("gateAdminBtn").onclick = openWithAdminPassword;
 $("gateRetryBtn").onclick = bootstrapAuth;
 
 $("followSearch").oninput = renderFollowList;
@@ -872,7 +894,6 @@ $("lockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: true 
 $("unlockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: false }, "맞팔확인 잠금을 해제했습니다.");
 
 $("changeAccessPasswordBtn").onclick = () => changePassword("changeAccessPassword", "newAccessPassword", "접속 비밀번호를 변경했습니다.");
-$("changeAppLockPasswordBtn").onclick = () => changePassword("changeAppLockPassword", "newAppLockPassword", "앱잠금 비밀번호를 변경했습니다.");
 $("changeMatchPasswordBtn").onclick = () => changePassword("changeMatchPassword", "newMatchPassword", "맞팔확인 비밀번호를 변경했습니다.");
 
 $("saveNoticeBtn").onclick = saveNotice;
@@ -908,7 +929,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=270").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=280").catch(() => {});
   }
 
   setInterval(async () => {

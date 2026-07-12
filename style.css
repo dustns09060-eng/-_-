@@ -214,3 +214,40 @@ body.gate-open{overflow:hidden}
 .log-row span{font-weight:900}
 .log-row small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 @media(max-width:600px){.log-row{grid-template-columns:1fr}.log-row small{white-space:normal}}
+
+
+/* V28 미니멀 접속 화면 */
+.access-card{width:min(390px,100%);padding:28px 22px}
+.access-card #gateMessage:empty{display:none}
+.access-role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+.access-role{
+  min-height:122px;border:1px solid var(--line);border-radius:18px;background:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  font:inherit;font-weight:900;color:var(--text);cursor:pointer;
+  box-shadow:0 6px 18px rgba(20,28,40,.04)
+}
+.access-role.general{border-color:#ffd5b8;background:#fffaf6}
+.access-role.admin{border-color:#dfe3e8;background:#fafbfc}
+.access-role:active{transform:scale(.98)}
+.role-icon{font-size:31px;line-height:1}
+#gateBackBtn{margin-top:0}
+.simple-stats{display:flex;gap:10px;margin:14px 0}
+.simple-stats article{
+  min-width:120px;display:flex;align-items:center;gap:8px;
+  padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff
+}
+.simple-stats article span{font-size:18px;color:var(--orange)}
+.simple-stats article strong{font-size:18px}
+.icon-btn{
+  width:42px;height:42px;border:1px solid var(--line);border-radius:12px;
+  background:#fff;color:var(--text);font-size:21px;font-weight:900;cursor:pointer
+}
+.icon-btn:active{transform:rotate(25deg)}
+.section-title-row h2{margin-bottom:0}
+#adminView .card>h2{margin-bottom:16px}
+#adminPanel .section-title-row>div>h2{margin-bottom:0}
+@media(max-width:520px){
+  .access-role-grid{grid-template-columns:1fr}
+  .access-role{min-height:92px;flex-direction:row}
+  .simple-stats{overflow:auto}
+}
