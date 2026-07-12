@@ -14,10 +14,10 @@ let matchGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V30";
+const APP_VERSION = "V31";
 
 let config = {
-  version: "V30 NOTICE NAV",
+  version: "V31 ONE LINE",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -498,10 +498,10 @@ function renderFollowList() {
   $("followList").innerHTML = items.length
     ? items.map((item) => `
       <div class="follow-item">
-        <span>${escapeHtml(item.no)}</span>
-        <span>${escapeHtml(item.name)}</span>
-        <a href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>
-        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">인스타</a>
+        <span class="follow-no">${escapeHtml(item.no)}</span>
+        <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+        <a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">@${escapeHtml(item.id)}</a>
+        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">열기 →</a>
       </div>`).join("")
     : '<div class="empty-state">검색 결과가 없습니다.</div>';
 }
@@ -676,7 +676,7 @@ function renderMatchList() {
           <a class="id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>
         </div>
         <span class="badge ${item.status}">${statusLabel(item.status)}</span>
-        <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">인스타</a>
+        <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">열기 →</a>
       </div>`).join("")
     : '<div class="empty-state">결과가 없습니다.</div>';
 }
@@ -939,7 +939,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=300").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=310").catch(() => {});
   }
 
   setInterval(async () => {
