@@ -1,136 +1,956 @@
-const SHEET_ID="1QfguFyvtgNUyfd4-ufMxAWRwItHuIY6M4wGAQstteW0";
-const SHEET_NAME="Sheet2";
-const ADMIN_PASSWORD="0702";
-let members=[],followers=new Set(),following=new Set(),comparison=[],activeFilter="all",deferredPrompt=null;
-const $=id=>document.getElementById(id);
-const norm=v=>String(v||"").trim().replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//i,"").replace(/^_u\//i,"").split(/[/?#]/)[0].toLowerCase();
-const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+const $ = (id) => document.getElementById(id);
 
-function switchView(view){
-  $("checkView").classList.toggle("hidden",view!=="check");
-  $("adminView").classList.toggle("hidden",view!=="admin");
-  document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-  if(view==="check") updateLock();
-  if(view==="admin"&&sessionStorage.getItem("admin")==="1") showAdmin();
-  scrollTo(0,0);
+let roomList = [];
+let result = { all: [], mutual: [], onlyMe: [], fansOnly: [], neither: [] };
+let currentTab = "all";
+let currentGroup = 0;
+let installPrompt = null;
+let adminLoggedIn = false;
+let adminPasswordValue = "";
+let publicConfig = null;
+let accessGranted = false;
+let appLockGranted = false;
+let matchGranted = false;
+let gateMode = "loading";
+let securityVersion = "";
+let noticeSignature = "";
+const APP_VERSION = "V32";
+
+let config = {
+  version: "V32 POLISHED UI",
+  appName: "여우방 팔로우리스트+맞팔확인",
+  apiUrl: "",
+  sheetId: "",
+  sheetName: "Sheet1",
+  fallbackCsv: "room-list.csv",
+};
+
+function toast(message) {
+  const el = $("toast");
+  el.textContent = message;
+  el.style.display = "block";
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (el.style.display = "none"), 1900);
 }
-function fetchSheet(){
-  return new Promise((resolve,reject)=>{
-    const cb="sheetcb_"+Date.now(),s=document.createElement("script");
-    const timer=setTimeout(()=>{cleanup();reject(new Error("timeout"));},12000);
-    function cleanup(){clearTimeout(timer);try{delete window[cb]}catch(e){}s.remove()}
-    window[cb]=data=>{cleanup();resolve(data)};
-    s.onerror=()=>{cleanup();reject(new Error("load"))};
-    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=responseHandler:${cb};out:json&cache=${Date.now()}`;
-    document.head.appendChild(s);
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
+function normalize(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//, "")
+    .replace(/^instagram\.com\//, "")
+    .replace(/^_u\//, "")
+    .replace(/^@+/, "")
+    .replace(/[?#].*$/, "")
+    .replace(/\/+$/, "")
+    .trim();
+}
+
+function validUsername(value) {
+  return /^[a-z0-9._]{1,30}$/.test(value) &&
+    !["instagram", "accounts", "explore", "direct", "p", "reels", "stories", "www", "about", "privacy", "terms", "login", "_u"].includes(value);
+}
+
+function unique(values) {
+  const set = new Set();
+  for (const value of values || []) {
+    const id = normalize(value);
+    if (validUsername(id)) set.add(id);
+  }
+  return [...set];
+}
+
+async function loadConfig() {
+  try {
+    const response = await fetch(`config.json?t=${Date.now()}`, { cache: "no-store" });
+    if (response.ok) config = { ...config, ...(await response.json()) };
+  } catch (_) {}
+}
+
+async function apiGet(action) {
+  if (!config.apiUrl) throw new Error("Apps Script 주소가 설정되지 않았습니다.");
+  const url = new URL(config.apiUrl);
+  url.searchParams.set("action", action);
+  url.searchParams.set("_t", Date.now().toString());
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    cache: "no-store",
+    redirect: "follow",
+  });
+  if (!response.ok) throw new Error(`API HTTP ${response.status}`);
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || "API 요청 실패");
+  return data;
+}
+
+async function apiPost(action, payload = {}) {
+  if (!config.apiUrl) throw new Error("Apps Script 주소가 설정되지 않았습니다.");
+
+  const params = new URLSearchParams();
+  params.set("action", action);
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      params.set(key, typeof value === "object" ? JSON.stringify(value) : String(value));
+    }
+  });
+
+  const response = await fetch(config.apiUrl, {
+    method: "POST",
+    body: params,
+    redirect: "follow",
+  });
+  if (!response.ok) throw new Error(`API HTTP ${response.status}`);
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || "API 요청 실패");
+  return data;
+}
+
+function setGate(mode, message = "") {
+  gateMode = mode;
+  const title = $("gateTitle");
+  const text = $("gateMessage");
+  const roles = $("gateRoleSelect");
+  const form = $("gateForm");
+  const retryBtn = $("gateRetryBtn");
+  const password = $("gatePassword");
+
+  $("gateError").textContent = "";
+  roles.classList.add("hidden");
+  form.classList.add("hidden");
+  retryBtn.classList.add("hidden");
+  password.value = "";
+
+  if (mode === "loading") {
+    title.textContent = "접속 확인";
+    text.textContent = message || "설정을 불러오는 중입니다.";
+  } else if (mode === "role") {
+    title.textContent = "여우방";
+    text.textContent = "";
+    roles.classList.remove("hidden");
+  } else if (mode === "access") {
+    title.textContent = "이용하기";
+    text.textContent = "";
+    password.placeholder = "접속 비밀번호";
+    form.classList.remove("hidden");
+  } else if (mode === "admin") {
+    title.textContent = "운영진";
+    text.textContent = "";
+    password.placeholder = "운영진 비밀번호";
+    form.classList.remove("hidden");
+  } else if (mode === "blocked") {
+    title.textContent = "앱 잠금 중";
+    text.textContent = "현재 일반 접속이 잠겨 있습니다.";
+    form.classList.remove("hidden");
+    password.classList.add("hidden");
+    $("gateSubmitBtn").classList.add("hidden");
+  } else if (mode === "error") {
+    title.textContent = "연결 확인 필요";
+    text.textContent = message || "연결에 실패했습니다.";
+    retryBtn.classList.remove("hidden");
+  }
+
+  if (mode !== "blocked") {
+    password.classList.remove("hidden");
+    $("gateSubmitBtn").classList.remove("hidden");
+  }
+}
+
+function showGate() {
+  $("appGate").classList.remove("hidden");
+  document.body.classList.add("gate-open");
+}
+
+function hideGate() {
+  $("appGate").classList.add("hidden");
+  document.body.classList.remove("gate-open");
+}
+
+function setAdminNavigation(enabled) {
+  $("adminNavBtn")?.classList.toggle("hidden", !enabled);
+  $("noticeNavBtn")?.classList.toggle("hidden", enabled);
+}
+
+async function bootstrapAuth() {
+  showGate();
+  setGate("loading");
+
+  try {
+    publicConfig = await apiGet("publicConfig");
+    updateLockIndicators();
+    setGate("role");
+  } catch (error) {
+    setGate("error", `설정을 불러오지 못했습니다. ${error.message}`);
+  }
+}
+
+function chooseGeneralAccess() {
+  if (publicConfig?.appLocked) {
+    setGate("blocked");
+    return;
+  }
+  setGate("access");
+}
+
+function chooseAdminAccess() {
+  setGate("admin");
+}
+
+function backToRoleSelect() {
+  setGate("role");
+}
+
+async function submitGatePassword() {
+  const password = $("gatePassword").value.trim();
+  if (!password) {
+    $("gateError").textContent = "비밀번호를 입력해 주세요.";
+    return;
+  }
+
+  try {
+    $("gateSubmitBtn").disabled = true;
+
+    if (gateMode === "access") {
+      await apiPost("verifyAccessPassword", { password });
+      accessGranted = true;
+      adminLoggedIn = false;
+      adminPasswordValue = "";
+      setAdminNavigation(false);
+      hideGate();
+      showView("followView");
+      await loadAfterAuth();
+      return;
+    }
+
+    if (gateMode === "admin") {
+      await apiPost("adminLogin", { password });
+      adminLoggedIn = true;
+      adminPasswordValue = password;
+      accessGranted = true;
+      matchGranted = true;
+      setAdminNavigation(true);
+      hideGate();
+      await loadAfterAuth();
+      showView("adminView");
+      showAdminPanel();
+      loadAdminLogs();
+      toast("운영진으로 접속했습니다.");
+    }
+  } catch (error) {
+    $("gateError").textContent =
+      gateMode === "admin"
+        ? "운영진 비밀번호가 올바르지 않습니다."
+        : "접속 비밀번호가 올바르지 않습니다.";
+  } finally {
+    $("gateSubmitBtn").disabled = false;
+  }
+}
+
+async function loadAfterAuth() {
+  await Promise.allSettled([loadRoomList(false), loadNotices(false), refreshPublicConfig(false)]);
+  securityVersion = publicConfig?.securityVersion || "";
+  checkVersionUpdate();
+}
+
+async function refreshPublicConfig(recheck = true) {
+  const previousSecurity = securityVersion || publicConfig?.securityVersion || "";
+  publicConfig = await apiGet("publicConfig");
+  updateLockIndicators();
+  applyMatchLock();
+  checkVersionUpdate();
+
+  const nextSecurity = publicConfig?.securityVersion || "";
+  if (recheck && previousSecurity && nextSecurity && previousSecurity !== nextSecurity && !adminLoggedIn) {
+    securityVersion = nextSecurity;
+    accessGranted = false;
+    appLockGranted = false;
+    matchGranted = false;
+    toast("보안 설정이 변경되어 다시 로그인합니다.");
+    setAdminNavigation(false);
+    await bootstrapAuth();
+    return;
+  }
+  securityVersion = nextSecurity;
+}
+
+function checkVersionUpdate() {
+  if (!publicConfig?.forceUpdate) return;
+  const serverVersion = String(publicConfig.version || "").trim().toUpperCase();
+  if (!serverVersion || serverVersion === APP_VERSION) return;
+  $("updateMessage").textContent = `현재 ${APP_VERSION} · 최신 ${serverVersion}`;
+  $("updateOverlay").classList.remove("hidden");
+}
+
+function updateLockIndicators() {
+  const appLocked = Boolean(publicConfig?.appLocked);
+  const matchLocked = Boolean(publicConfig?.matchLocked);
+
+  if ($("appLockState")) {
+    $("appLockState").textContent = appLocked ? "잠금 중" : "사용 가능";
+    $("appLockState").className = `lock-state ${appLocked ? "locked" : "unlocked"}`;
+  }
+
+  if ($("matchLockState")) {
+    $("matchLockState").textContent = matchLocked ? "잠금 중" : "사용 가능";
+    $("matchLockState").className = `lock-state ${matchLocked ? "locked" : "unlocked"}`;
+  }
+}
+
+function applyMatchLock() {
+  const locked = Boolean(publicConfig?.matchLocked) && !matchGranted && !adminLoggedIn;
+  $("matchLockCard").classList.toggle("hidden", !locked);
+  $("matchContent").classList.toggle("hidden", locked);
+}
+
+async function unlockMatch() {
+  const password = $("matchPassword").value.trim();
+  if (!password) {
+    $("matchUnlockMsg").textContent = "비밀번호를 입력해 주세요.";
+    return;
+  }
+
+  try {
+    await apiPost("verifyMatchPassword", { password });
+    matchGranted = true;
+    $("matchUnlockMsg").textContent = "";
+    $("matchPassword").value = "";
+    applyMatchLock();
+    toast("맞팔확인 잠금이 해제되었습니다.");
+  } catch (_) {
+    $("matchUnlockMsg").textContent = "맞팔확인 비밀번호가 올바르지 않습니다.";
+  }
+}
+
+function sheetUrl() {
+  return `https://docs.google.com/spreadsheets/d/${config.sheetId}/edit`;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      i++;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (cell || row.length) {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = "";
+      }
+      if (char === "\r" && next === "\n") i++;
+    } else {
+      cell += char;
+    }
+  }
+
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function rowsToRoom(rows) {
+  const list = [];
+  rows.forEach((row, index) => {
+    const joined = row.join(" ");
+    if (index === 0 && (joined.includes("번호") || joined.includes("닉네임") || joined.includes("아이디"))) return;
+
+    const id = normalize(row[2] || row[1] || row[0]);
+    if (validUsername(id)) {
+      list.push({
+        no: row[0] || list.length + 1,
+        name: row[1] || "",
+        id,
+      });
+    }
+  });
+
+  const seen = new Set();
+  return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
+}
+
+async function loadRoomList(show = false) {
+  setSheetState("불러오는 중");
+  let lastError = "";
+
+  try {
+    const data = await apiGet("roomList");
+    roomList = (data.members || []).map((item, index) => ({
+      no: item.no || index + 1,
+      name: item.name || "",
+      id: normalize(item.id),
+    })).filter((item) => validUsername(item.id));
+
+    if (!roomList.length) throw new Error("API 명단 0명");
+
+    setSheetState("정상");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+    if (show) toast("명단 새로고침 완료");
+    return;
+  } catch (error) {
+    lastError = error.message;
+  }
+
+  const urls = [];
+  if (config.sheetId) {
+    const sheet = encodeURIComponent(config.sheetName || "Sheet1");
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
+  }
+  urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const list = rowsToRoom(parseCsv(await response.text()));
+      if (!list.length) throw new Error("0명");
+      roomList = list;
+      setSheetState("백업");
+      updateFollowStats();
+      renderGroupTabs();
+      renderFollowList();
+      if (show) toast("백업 명단으로 불러왔습니다.");
+      return;
+    } catch (error) {
+      lastError = error.message;
+    }
+  }
+
+  setSheetState("오류");
+  $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
+  if (show) toast("명단 불러오기 실패");
+}
+
+function setSheetState(state) {
+  if ($("roomState")) {
+    $("roomState").textContent = state === "정상" || state === "백업" ? `${roomList.length}명 준비 완료` : state;
+  }
+  if ($("adminApiState")) $("adminApiState").textContent = state;
+}
+
+function updateFollowStats() {
+  const groups = Math.ceil(roomList.length / 500);
+  $("followTotal").textContent = `${roomList.length}명`;
+  $("groupTotal").textContent = `${groups}조`;
+  $("lastRefresh").textContent = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  $("adminTotal").textContent = `${roomList.length}명`;
+  $("adminGroups").textContent = `${groups}조`;
+  $("followState").textContent = `전체 ${roomList.length}명 · 500명씩 ${groups}개 조`;
+}
+
+function renderGroupTabs() {
+  const total = Math.max(1, Math.ceil(roomList.length / 500));
+  $("groupTabs").innerHTML = ["전체", ...Array.from({ length: total }, (_, i) => `${i + 1}조`)]
+    .map((text, index) => `<button class="group-tab ${index === currentGroup ? "active" : ""}" data-group="${index}">${text}</button>`)
+    .join("");
+
+  document.querySelectorAll(".group-tab").forEach((button) => {
+    button.onclick = () => {
+      currentGroup = Number(button.dataset.group);
+      renderGroupTabs();
+      renderFollowList();
+    };
   });
 }
-async function loadMembers(){
-  $("analyzeStatus").textContent="구글시트 명단을 불러오는 중입니다.";
-  try{
-    const j=await fetchSheet();
-    members=(j.table?.rows||[]).map(r=>{
-      const c=r.c||[];
-      return {no:Number(String(c[0]?.v??"").replace(/[^0-9]/g,"")),nickname:String(c[1]?.v??"").trim(),id:norm(c[2]?.v??"")};
-    }).filter(x=>x.no&&x.nickname&&x.id).sort((a,b)=>a.no-b.no);
-    $("analyzeStatus").textContent=`명단 ${members.length.toLocaleString()}명을 불러왔습니다. ZIP 파일을 선택해 주세요.`;
-    if(followers.size||following.size) buildComparison();
-  }catch(e){$("analyzeStatus").textContent="명단을 불러오지 못했습니다. 구글시트 공개 설정을 확인해 주세요."}
-}
-function parseHtml(text){
-  const doc=new DOMParser().parseFromString(text,"text/html"),set=new Set();
-  doc.querySelectorAll("a").forEach(a=>{
-    const href=a.getAttribute("href")||"",label=(a.textContent||"").trim(),m=href.match(/instagram\.com\/(?:_u\/)?([^/?#]+)/i);
-    const id=norm(m?m[1]:label);
-    if(id&&/^[a-z0-9._]+$/.test(id)&&!["accounts","explore","p","reel"].includes(id))set.add(id);
-  });return set;
-}
-function parseJson(text){
-  const set=new Set(),data=JSON.parse(text);
-  function walk(v){
-    if(Array.isArray(v)){v.forEach(walk);return}
-    if(!v||typeof v!=="object")return;
-    if(Array.isArray(v.string_list_data))v.string_list_data.forEach(i=>{const id=norm(i.value||i.href||"");if(id&&/^[a-z0-9._]+$/.test(id))set.add(id)});
-    if(typeof v.title==="string"){const id=norm(v.title);if(id&&/^[a-z0-9._]+$/.test(id))set.add(id)}
-    Object.values(v).forEach(walk);
-  }walk(data);return set;
-}
-async function analyze(){
-  if(isLocked())return;
-  const file=$("instagramZip").files[0];
-  if(!file){alert("ZIP 파일을 선택해 주세요.");return}
-  if(!members.length){alert("구글시트 명단을 먼저 불러와 주세요.");return}
-  try{
-    $("analyzeStatus").textContent="ZIP 파일을 분석 중입니다.";
-    const zip=await JSZip.loadAsync(file),names=Object.keys(zip.files).filter(n=>!zip.files[n].dir);
-    const ff=names.filter(n=>/(^|\/)followers(_\d+)?\.(html|json)$/i.test(n));
-    const fg=names.filter(n=>/(^|\/)following\.(html|json)$/i.test(n));
-    if(!ff.length||!fg.length)throw new Error("followers 또는 following 파일을 찾지 못했습니다.");
-    followers=new Set();following=new Set();
-    for(const n of ff){const t=await zip.file(n).async("text"),ids=/\.json$/i.test(n)?parseJson(t):parseHtml(t);ids.forEach(id=>followers.add(id))}
-    for(const n of fg){const t=await zip.file(n).async("text"),ids=/\.json$/i.test(n)?parseJson(t):parseHtml(t);ids.forEach(id=>following.add(id))}
-    buildComparison();
-    $("analyzeStatus").textContent=`분석 완료 · 팔로워 ${followers.size.toLocaleString()}명 / 팔로잉 ${following.size.toLocaleString()}명`;
-  }catch(e){$("analyzeStatus").textContent="분석에 실패했습니다.";alert(e.message)}
-}
-function buildComparison(){
-  comparison=members.map(x=>{
-    const a=followers.has(x.id),b=following.has(x.id);
-    return {...x,status:a&&b?"mutual":b?"onlyMe":a?"onlyThem":"neither"};
-  });
-  const total=comparison.length||1,count=s=>comparison.filter(x=>x.status===s).length,pct=n=>(n/total*100).toFixed(1)+"%";
-  const vals={mutual:count("mutual"),onlyMe:count("onlyMe"),onlyThem:count("onlyThem"),neither:count("neither")};
-  for(const k of Object.keys(vals)){const id=k==="mutual"?"mutual":k;$((id)+"Count").textContent=vals[k].toLocaleString()+"명";$((id)+"Pct").textContent=pct(vals[k])}
-  $("mutualRate").textContent=pct(vals.mutual);$("rateFraction").textContent=`${vals.mutual}/${comparison.length}명`;
-  document.querySelector('[data-filter="all"]').textContent=`전체 (${comparison.length})`;
-  document.querySelector('[data-filter="mutual"]').textContent=`맞팔 (${vals.mutual})`;
-  document.querySelector('[data-filter="onlyMe"]').textContent=`나만 팔로우 (${vals.onlyMe})`;
-  document.querySelector('[data-filter="onlyThem"]').textContent=`상대만 팔로우 (${vals.onlyThem})`;
-  document.querySelector('[data-filter="neither"]').textContent=`서로 안 함 (${vals.neither})`;
-  renderResults();
-}
-function label(s){return {mutual:"맞팔 완료",onlyMe:"나만 팔로우 함",onlyThem:"상대가 팔로우만 함",neither:"서로 팔로우 안 함"}[s]}
-function renderResults(){
-  const q=$("checkSearch").value.toLowerCase().trim();
-  const rows=comparison.filter(x=>(activeFilter==="all"||x.status===activeFilter)&&(x.no+" "+x.nickname+" "+x.id).toLowerCase().includes(q));
-  $("checkList").innerHTML=rows.length?rows.map(x=>`
-    <div class="result-item">
-      <div class="result-no">${x.no}</div>
-      <div class="result-main">
-        <strong>${esc(x.nickname)}</strong>
-        <b>@${esc(x.id)}</b>
-        <small class="status-${x.status}">${label(x.status)}</small>
-      </div>
-      <a class="open-btn" href="https://instagram.com/${encodeURIComponent(x.id)}" target="_blank" rel="noopener">↗ 열기</a>
-    </div>`).join(""):'<div class="empty">표시할 결과가 없습니다.</div>';
-}
-function resetAnalysis(){followers=new Set();following=new Set();comparison=[];$("instagramZip").value="";$("checkList").innerHTML="";["mutual","onlyMe","onlyThem","neither"].forEach(k=>{$(k+"Count").textContent="0명";$(k+"Pct").textContent="0%"});$("mutualRate").textContent="0%";$("rateFraction").textContent="0/0명";$("analyzeStatus").textContent="ZIP 파일을 선택해 주세요."}
-function copyMismatch(){
-  const ids=comparison.filter(x=>x.status!=="mutual").map(x=>`${x.no}. ${x.nickname} @${x.id} - ${label(x.status)}`).join("\n");
-  if(!ids){alert("복사할 미맞팔 결과가 없습니다.");return}
-  navigator.clipboard.writeText(ids).then(()=>alert("미맞팔 명단을 복사했습니다."));
-}
-function isLocked(){return localStorage.getItem("yeowooCheckLocked")!=="0"}
-function updateLock(){
-  const locked=isLocked();$("checkLockPanel").classList.toggle("hidden",!locked);$("checkContent").classList.toggle("hidden",locked);$("lockButtonText").textContent=locked?"맞팔 잠금 해제":"맞팔 잠그기";
-}
-function toggleLock(){localStorage.setItem("yeowooCheckLocked",isLocked()?"0":"1");updateLock();alert(isLocked()?"맞팔확인을 잠갔습니다.":"맞팔확인 잠금을 해제했습니다.")}
-function showAdmin(){$("adminLoginBox").classList.add("hidden");$("adminPanel").classList.remove("hidden");updateLock()}
-function login(){if($("adminPassword").value===ADMIN_PASSWORD){sessionStorage.setItem("admin","1");showAdmin()}else{alert("비밀번호가 틀렸습니다.");$("adminPassword").value=""}}
-function logout(){sessionStorage.removeItem("admin");$("adminPanel").classList.add("hidden");$("adminLoginBox").classList.remove("hidden")}
-function renderNotice(){const n=localStorage.getItem("yeowooNotice")||"";$("noticeBar").classList.toggle("hidden",!n);$("noticeText").textContent=n;$("noticeInput").value=n}
-function saveNotice(){localStorage.setItem("yeowooNotice",$("noticeInput").value.trim());renderNotice();alert("공지를 저장했습니다.")}
-function deleteNotice(){localStorage.removeItem("yeowooNotice");renderNotice();alert("공지를 삭제했습니다.")}
 
-document.addEventListener("click",e=>{
-  const view=e.target.closest("[data-view]")?.dataset.view;if(view)switchView(view);
-  const filter=e.target.closest("[data-filter]")?.dataset.filter;
-  if(filter){activeFilter=filter;document.querySelectorAll("[data-filter]").forEach(b=>b.classList.remove("active"));e.target.closest("[data-filter]").classList.add("active");renderResults()}
+function followFiltered() {
+  const query = String($("followSearch").value || "").trim().toLowerCase();
+  let items = roomList;
+  if (currentGroup > 0) items = items.slice((currentGroup - 1) * 500, currentGroup * 500);
+
+  return query
+    ? items.filter((item) =>
+        String(item.no).includes(query) ||
+        item.id.includes(normalize(query)) ||
+        String(item.name).toLowerCase().includes(query))
+    : items;
+}
+
+function renderFollowList() {
+  const items = followFiltered();
+  $("followList").innerHTML = items.length
+    ? items.map((item) => `
+      <div class="follow-item">
+        <span class="follow-no">${escapeHtml(item.no)}</span>
+        <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+        <a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">@${escapeHtml(item.id)}</a>
+        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
+      </div>`).join("")
+    : '<div class="empty-state">검색 결과가 없습니다.</div>';
+}
+
+function showView(id) {
+  document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === id));
+  document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === id));
+  if (id === "matchView") applyMatchLock();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function findFiles(zip) {
+  const files = Object.keys(zip.files).filter((path) => !zip.files[path].dir);
+  return {
+    followers: files.filter((path) => /followers_\d+\.(html|json)$/i.test(path.replace(/\\/g, "/").split("/").pop())),
+    following: files.find((path) => /^following\.(html|json)$/i.test(path.replace(/\\/g, "/").split("/").pop())),
+  };
+}
+
+function extractHtml(text) {
+  const ids = [];
+  let match;
+  let regex = /href=["']https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]+)\/?[^"']*["']/gi;
+  while ((match = regex.exec(text))) ids.push(match[1]);
+
+  if (!ids.length) {
+    regex = /https?:\/\/(?:www\.)?instagram\.com\/(?:_u\/)?([A-Za-z0-9._]+)/gi;
+    while ((match = regex.exec(text))) ids.push(match[1]);
+  }
+  return unique(ids);
+}
+
+function walkJson(value, output) {
+  if (value == null) return;
+  if (typeof value === "string") {
+    const id = normalize(value);
+    if (validUsername(id)) output.push(id);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => walkJson(item, output));
+    return;
+  }
+  if (typeof value === "object") Object.values(value).forEach((item) => walkJson(item, output));
+}
+
+function extractJson(text) {
+  const output = [];
+  try { walkJson(JSON.parse(text), output); } catch (_) {}
+  return unique(output);
+}
+
+async function parseInstagramZip(file) {
+  if (!file) throw new Error("ZIP 파일을 선택해 주세요.");
+  if (!window.JSZip) throw new Error("ZIP 분석 라이브러리를 불러오지 못했습니다.");
+
+  const zip = await JSZip.loadAsync(file);
+  const paths = findFiles(zip);
+
+  if (!paths.followers.length) throw new Error("followers_1 파일을 찾지 못했습니다.");
+  if (!paths.following) throw new Error("following 파일을 찾지 못했습니다.");
+
+  let followers = [];
+  for (const path of paths.followers) {
+    const text = await zip.files[path].async("string");
+    followers.push(...(path.endsWith(".json") ? extractJson(text) : extractHtml(text)));
+  }
+
+  const followingText = await zip.files[paths.following].async("string");
+  const following = paths.following.endsWith(".json") ? extractJson(followingText) : extractHtml(followingText);
+
+  return { followers: unique(followers), following };
+}
+
+function classify(followers, following) {
+  const followerSet = new Set(followers);
+  const followingSet = new Set(following);
+
+  const all = roomList.map((person) => ({
+    ...person,
+    status:
+      followerSet.has(person.id) && followingSet.has(person.id) ? "mutual" :
+      !followerSet.has(person.id) && followingSet.has(person.id) ? "onlyMe" :
+      followerSet.has(person.id) && !followingSet.has(person.id) ? "fansOnly" :
+      "neither",
+  }));
+
+  result = {
+    all,
+    mutual: all.filter((item) => item.status === "mutual"),
+    onlyMe: all.filter((item) => item.status === "onlyMe"),
+    fansOnly: all.filter((item) => item.status === "fansOnly"),
+    neither: all.filter((item) => item.status === "neither"),
+  };
+}
+
+async function analyze() {
+  if (publicConfig?.matchLocked && !matchGranted && !adminLoggedIn) {
+    applyMatchLock();
+    toast("맞팔확인 비밀번호를 먼저 입력해 주세요.");
+    return;
+  }
+
+  const button = $("analyzeBtn");
+  try {
+    button.disabled = true;
+    button.textContent = "분석 중...";
+    if (!roomList.length) await loadRoomList();
+    const parsed = await parseInstagramZip($("zipFile").files[0]);
+    classify(parsed.followers, parsed.following);
+    updateSummary();
+    showTab("all");
+    $("summarySection").classList.remove("hidden");
+    $("resultsSection").classList.remove("hidden");
+    $("status").textContent = `분석 완료 · 단톡방 ${roomList.length}명 기준`;
+    toast("분석 완료");
+  } catch (error) {
+    $("status").textContent = `오류: ${error.message}`;
+    toast("분석 실패");
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '맞팔 분석 시작 <span>→</span>';
+  }
+}
+
+function percent(value, total) {
+  return total ? `${((value / total) * 100).toFixed(1)}%` : "0%";
+}
+
+function updateSummary() {
+  const total = result.all.length;
+  for (const key of ["mutual", "onlyMe", "fansOnly", "neither"]) {
+    $(`${key}Count`).textContent = `${result[key].length}명`;
+    $(`${key}Rate`).textContent = percent(result[key].length, total);
+    $(`tab${key[0].toUpperCase() + key.slice(1)}`).textContent = result[key].length;
+  }
+  $("tabAll").textContent = total;
+  $("rateText").innerHTML = `단톡방 맞팔률 <strong>${percent(result.mutual.length, total)}</strong> · ${result.mutual.length}/${total}명`;
+}
+
+function statusLabel(status) {
+  return {
+    mutual: "맞팔 완료",
+    onlyMe: "나만 팔로우 함",
+    fansOnly: "상대가 팔로우만 함",
+    neither: "서로 팔로우 안 함",
+  }[status];
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
+  renderMatchList();
+}
+
+function matchFiltered() {
+  const query = String($("searchInput").value || "").trim().toLowerCase();
+  const items = result[currentTab] || [];
+  return query
+    ? items.filter((item) => item.id.includes(normalize(query)) || String(item.name).toLowerCase().includes(query))
+    : items;
+}
+
+function renderMatchList() {
+  const items = matchFiltered();
+  $("list").innerHTML = items.length
+    ? items.map((item, index) => `
+      <div class="item">
+        <span class="item-no">${index + 1}</span>
+        <div class="item-person">
+          <strong class="item-name">${escapeHtml(item.name)}</strong>
+          <a class="id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>
+        </div>
+        <span class="badge ${item.status}">${statusLabel(item.status)}</span>
+        <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
+      </div>`).join("")
+    : '<div class="empty-state">결과가 없습니다.</div>';
+}
+
+async function copyCurrent() {
+  const items = currentTab === "all" ? [...result.onlyMe, ...result.neither] : matchFiltered();
+  if (!items.length) return toast("복사할 명단이 없습니다.");
+
+  await navigator.clipboard.writeText(
+    items.map((item, index) => `${index + 1}. ${item.name} @${item.id} - ${statusLabel(item.status)}`).join("\n")
+  );
+  toast("복사 완료");
+}
+
+function downloadCsv() {
+  const items = matchFiltered();
+  if (!items.length) return toast("다운로드할 명단이 없습니다.");
+
+  const rows = [
+    ["번호", "닉네임", "아이디", "상태"],
+    ...items.map((item, index) => [index + 1, item.name, `@${item.id}`, statusLabel(item.status)]),
+  ];
+  const csv = "\ufeff" + rows
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "여우방_명단.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function resetAnalysis() {
+  $("zipFile").value = "";
+  $("fileName").textContent = "인스타그램 ZIP 파일 선택";
+  $("summarySection").classList.add("hidden");
+  $("resultsSection").classList.add("hidden");
+}
+
+async function loadNotices(notify = true) {
+  try {
+    const data = await apiGet("notices");
+    const notices = data.notices || [];
+    const nextSignature = JSON.stringify(notices.map(item => [item.noticeId, item.createdAt, item.content]));
+    if (notify && noticeSignature && nextSignature !== noticeSignature && notices.length) {
+      $("noticeCard").classList.remove("hidden");
+      toast("새 공지가 등록되었습니다.");
+    }
+    noticeSignature = nextSignature;
+    renderNotices(notices);
+  } catch (_) {
+    renderNotices([]);
+  }
+}
+
+function renderNotices(notices) {
+  $("adminNotices").textContent = `${notices.length}개`;
+  $("noticeCard").classList.toggle("hidden", !notices.length);
+
+  $("noticeList").innerHTML = notices
+    .map((notice) => `<div class="notice-item"><p>${escapeHtml(notice.content)}</p></div>`)
+    .join("");
+
+  $("noticePageList").innerHTML = notices.length
+    ? notices.map((notice) => `
+      <article class="notice-page-item">
+        <div class="notice-page-time">${escapeHtml(notice.createdAt || "")}</div>
+        <p>${escapeHtml(notice.content)}</p>
+      </article>`).join("")
+    : '<p class="state-text">등록된 공지가 없습니다.</p>';
+
+  $("adminNoticeList").innerHTML = notices.length
+    ? notices.map((notice) => `
+      <div class="notice-row">
+        <div>
+          <strong>${escapeHtml(notice.createdAt)}</strong>
+          <div class="subtext">${escapeHtml(notice.content)}</div>
+        </div>
+        <button data-notice-id="${escapeHtml(notice.noticeId)}" type="button">삭제</button>
+      </div>`).join("")
+    : '<p class="state-text">등록된 공지가 없습니다.</p>';
+
+  document.querySelectorAll("[data-notice-id]").forEach((button) => {
+    button.onclick = () => deleteNotice(button.dataset.noticeId);
+  });
+}
+
+async function loadAdminLogs() {
+  if (!adminLoggedIn || !adminPasswordValue) return;
+  try {
+    const data = await apiPost("getAdminLogs", { adminPassword: adminPasswordValue });
+    const logs = data.logs || [];
+    $("adminLogList").innerHTML = logs.length
+      ? logs.map(log => `<div class="log-row"><strong>${escapeHtml(log.createdAt)}</strong><span>${escapeHtml(log.action)}</span><small>${escapeHtml(log.detail)}</small></div>`).join("")
+      : '<p class="state-text">저장된 로그가 없습니다.</p>';
+  } catch (error) {
+    $("adminLogList").innerHTML = `<p class="error-text">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function adminLogin() {
+  const password = $("adminPassword").value.trim();
+  if (!password) return;
+
+  try {
+    await apiPost("adminLogin", { password });
+    adminLoggedIn = true;
+    adminPasswordValue = password;
+    $("adminLoginMsg").textContent = "";
+    showAdminPanel();
+    loadAdminLogs();
+    matchGranted = true;
+    applyMatchLock();
+    toast("운영진 로그인 완료");
+  } catch (_) {
+    $("adminLoginMsg").textContent = "운영진 비밀번호가 올바르지 않습니다.";
+  }
+}
+
+function showAdminPanel() {
+  $("adminPanel").classList.remove("hidden");
+  $("adminLoginCard").classList.add("hidden");
+  updateLockIndicators();
+}
+
+function adminLogout() {
+  adminLoggedIn = false;
+  adminPasswordValue = "";
+  accessGranted = false;
+  matchGranted = false;
+  $("adminPanel").classList.add("hidden");
+  $("adminLoginCard").classList.remove("hidden");
+  $("adminPassword").value = "";
+  setAdminNavigation(false);
+  applyMatchLock();
+  bootstrapAuth();
+}
+
+async function runAdminAction(action, payload, successMessage) {
+  if (!adminLoggedIn || !adminPasswordValue) {
+    toast("운영진 로그인이 필요합니다.");
+    return null;
+  }
+
+  try {
+    const data = await apiPost(action, { adminPassword: adminPasswordValue, ...payload });
+    toast(successMessage);
+    await Promise.allSettled([refreshPublicConfig(false), loadNotices(false), loadAdminLogs()]);
+    return data;
+  } catch (error) {
+    toast(error.message || "변경 실패");
+    return null;
+  }
+}
+
+async function saveNotice() {
+  const content = $("noticeBody").value.trim();
+  if (!content) return toast("공지 내용을 입력해 주세요.");
+
+  const data = await runAdminAction("addNotice", { content }, "공지 저장 완료");
+  if (data) {
+    $("noticeBody").value = "";
+    renderNotices(data.notices || []);
+  }
+}
+
+async function deleteNotice(noticeId) {
+  const data = await runAdminAction("deleteNotice", { noticeId }, "공지 삭제 완료");
+  if (data) renderNotices(data.notices || []);
+}
+
+async function changePassword(action, inputId, message) {
+  const value = $(inputId).value.trim();
+  if (!value) return toast("새 비밀번호를 입력해 주세요.");
+
+  const data = await runAdminAction(action, { newPassword: value }, message);
+  if (data) $(inputId).value = "";
+}
+
+document.querySelectorAll(".nav-btn").forEach((button) => {
+  button.onclick = () => showView(button.dataset.view);
 });
-$("analyzeButton").onclick=analyze;$("resetAnalysis").onclick=resetAnalysis;$("checkSearch").oninput=renderResults;$("copyMismatch").onclick=copyMismatch;
-$("adminReloadButton").onclick=loadMembers;$("adminLoginButton").onclick=login;$("adminPassword").onkeydown=e=>{if(e.key==="Enter")login()};$("adminLogoutButton").onclick=logout;
-$("passwordToggle").onclick=()=>{const v=$("adminPassword").type==="text";$("adminPassword").type=v?"password":"text";$("passwordToggle").textContent=v?"보기":"숨김"};
-$("toggleLockButton").onclick=toggleLock;$("saveNoticeButton").onclick=saveNotice;$("deleteNoticeButton").onclick=deleteNotice;$("noticeClose").onclick=()=>$("noticeBar").classList.add("hidden");
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installButton").classList.remove("hidden")});
-$("installButton").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installButton").classList.add("hidden")};
-renderNotice();updateLock();loadMembers();
+
+$("generalAccessBtn").onclick = chooseGeneralAccess;
+$("adminAccessBtn").onclick = chooseAdminAccess;
+$("gateBackBtn").onclick = backToRoleSelect;
+$("gateSubmitBtn").onclick = submitGatePassword;
+$("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGatePassword(); };
+$("gateRetryBtn").onclick = bootstrapAuth;
+
+$("followSearch").oninput = renderFollowList;
+$("refreshFollowBtn").onclick = () => loadRoomList(true);
+$("reloadRoomBtn").onclick = () => loadRoomList(true);
+
+$("matchUnlockBtn").onclick = unlockMatch;
+$("matchPassword").onkeydown = (event) => { if (event.key === "Enter") unlockMatch(); };
+
+$("zipFile").onchange = () => {
+  $("fileName").textContent = $("zipFile").files[0]?.name || "인스타그램 ZIP 파일 선택";
+};
+$("analyzeBtn").onclick = analyze;
+$("resetBtn").onclick = resetAnalysis;
+$("searchInput").oninput = renderMatchList;
+$("copyBtn").onclick = copyCurrent;
+$("csvBtn").onclick = downloadCsv;
+document.querySelectorAll(".tab").forEach((button) => {
+  button.onclick = () => showTab(button.dataset.tab);
+});
+
+$("adminLoginBtn").onclick = adminLogin;
+$("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogin(); };
+$("adminLogoutBtn").onclick = adminLogout;
+$("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
+$("adminRefreshBtn").onclick = async () => {
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
+  toast("전체 새로고침 완료");
+};
+
+$("lockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: true }, "앱을 잠갔습니다.");
+$("unlockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: false }, "앱 잠금을 해제했습니다.");
+$("lockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: true }, "맞팔확인을 잠갔습니다.");
+$("unlockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: false }, "맞팔확인 잠금을 해제했습니다.");
+
+$("changeAccessPasswordBtn").onclick = () => changePassword("changeAccessPassword", "newAccessPassword", "접속 비밀번호를 변경했습니다.");
+$("changeMatchPasswordBtn").onclick = () => changePassword("changeMatchPassword", "newMatchPassword", "맞팔확인 비밀번호를 변경했습니다.");
+
+$("saveNoticeBtn").onclick = saveNotice;
+$("closeNoticeBtn").onclick = () => $("noticeCard").classList.add("hidden");
+$("refreshNoticeBtn").onclick = loadNotices;
+$("refreshLogsBtn").onclick = loadAdminLogs;
+$("updateNowBtn").onclick = async () => {
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(reg => reg.update().catch(() => {})));
+  }
+  const url = new URL(location.href);
+  url.searchParams.set("v", Date.now().toString());
+  location.replace(url.toString());
+};
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+});
+
+$("installBtn").onclick = async () => {
+  if (installPrompt) {
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+  } else {
+    toast("브라우저 메뉴에서 홈 화면에 추가를 눌러주세요.");
+  }
+};
+
+window.addEventListener("DOMContentLoaded", async () => {
+  await loadConfig();
+  await bootstrapAuth();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
+  }
+
+  setInterval(async () => {
+    if (!document.hidden && accessGranted) {
+      try { await refreshPublicConfig(true); } catch (_) {}
+    }
+  }, 30000);
+
+  setInterval(async () => {
+    if (!document.hidden && accessGranted) {
+      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
+    }
+  }, 60000);
+});
