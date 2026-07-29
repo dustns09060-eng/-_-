@@ -15,3 +15,11 @@
 
 ## 확인 주소
 https://dustns09060-eng.github.io/-_-/?v=320
+
+
+## V32 시트 연결 최종 수정
+- Google Sheet ID: `1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg`
+- GID: `1547262511`
+- Apps Script가 없어도 접속 화면이 열리도록 브라우저 로컬 인증을 적용했습니다.
+- 초기 일반/운영진 비밀번호: `0702`
+- 캐시 버전: `323`

@@ -1,8 +1,9 @@
 {
-  "version": "V32 POLISHED UI",
+  "version": "V32 POLISHED UI · SHEET FIX",
   "appName": "여우방 팔로우리스트+맞팔확인",
   "apiUrl": "",
   "sheetId": "1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg",
   "sheetName": "Sheet1",
-  "fallbackCsv": "room-list.csv"
+  "fallbackCsv": "room-list.csv",
+  "sheetGid": "1547262511"
 }

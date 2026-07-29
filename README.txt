@@ -1,21 +1,29 @@
-여우방 V243 새 구글시트 연결 파일
+여우방 팔로우리스트 V244
 
 연결된 구글시트
-- 문서 ID: 1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg
-- 시트 GID: 1547262511
+https://docs.google.com/spreadsheets/d/1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg/edit
+
+사용 시트
+팔로우 리스트
+
+읽는 열
+A열 번호
+B열 닉네임
+C열 아이디
+D열은 사용하지 않음
+
+현재 시트의 1~4행은 자동으로 무시하고,
+번호가 들어 있는 행만 명단으로 표시합니다.
 
 적용 방법
 1. ZIP 압축을 풉니다.
-2. GitHub 저장소의 기존 app.js를 삭제합니다.
-3. 이 ZIP 안의 app.js를 업로드합니다.
-4. Commit changes를 누릅니다.
-5. 사이트 주소 뒤에 ?v=243을 붙여 확인합니다.
+2. GitHub 저장소 기존 파일을 전부 교체합니다.
+3. Commit changes를 누릅니다.
+4. 사이트 주소 뒤에 ?v=244를 붙여 접속합니다.
+5. 이전 화면이 보이면 브라우저 캐시를 삭제하거나 시크릿 모드에서 확인합니다.
 
-구글시트 공유 설정
-- 공유 → 일반 액세스 → 링크가 있는 모든 사용자
-- 권한은 뷰어
+필수 구글시트 설정
+공유 → 일반 액세스 → 링크가 있는 모든 사용자 → 뷰어
 
-열 구성
-A열: 번호
-B열: 닉네임
-C열: 아이디
+운영진 비밀번호
+0702
