@@ -5,99 +5,90 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>여우방 맞팔확인</title>
-  <link rel="icon" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
-<header class="site-header">
-  <img class="brand-logo" src="icon-192.png" alt="여우방 로고">
-  <div class="brand-copy">
-    <h1>여우방 맞팔확인</h1>
-    <p>V243 · CHECK + ADMIN</p>
+<header class="topbar">
+  <div class="brand">
+    <img src="icon-192.png" alt="여우방">
+    <strong>여우방</strong>
   </div>
+  <button id="installButton" class="install-btn hidden">앱설치</button>
 </header>
 
-<div id="noticeBar" class="notice-bar hidden">
+<div id="noticeBar" class="notice hidden">
   <strong>공지</strong>
   <span id="noticeText"></span>
-  <button id="noticeClose" aria-label="공지 닫기">닫기</button>
+  <button id="noticeClose">×</button>
 </div>
 
 <main>
-  <section id="listView" class="view hidden" aria-hidden="true">
-    <div class="section-heading">
-      <div>
-        <h2>팔로우리스트</h2>
-        <p>Google Sheets의 Sheet1 명단을 자동으로 불러옵니다.</p>
-      </div>
-      <button id="reloadList" class="soft-btn">↻ 새로고침</button>
-    </div>
-
-    <div class="summary-grid">
-      <div><span>전체 인원</span><b id="totalPeople">0명</b></div>
-      <div><span>전체 페이지</span><b id="totalPages">0개</b></div>
-      <div><span>페이지 인원</span><b>500명</b></div>
-      <div><span>마지막 갱신</span><b id="updatedAt">대기</b></div>
-    </div>
-
-    <div class="search-box">
-      <span>⌕</span>
-      <input id="listSearch" placeholder="번호 · 닉네임 · 아이디 검색">
-    </div>
-    <div id="pageButtons" class="chip-row"></div>
-    <div id="listStatus" class="status-line">명단을 불러오는 중입니다.</div>
-
-    <div class="table-head">
-      <span>번호</span><span>닉네임</span><span>아이디</span><span>바로가기</span>
-    </div>
-    <div id="memberList" class="list-area"></div>
-  </section>
-
-  <section id="checkView" class="view">
-    <div id="checkLockPanel" class="lock-panel hidden">
+  <section id="checkView" class="page">
+    <div id="checkLockPanel" class="card lock-card hidden">
       <div class="lock-icon">🔒</div>
       <h2>맞팔확인 잠금 중</h2>
-      <p>현재 운영진이 맞팔확인 기능을 잠가두었습니다.</p>
-      <p>운영진에서 잠금을 해제한 뒤 이용할 수 있습니다.</p>
+      <p>운영진이 현재 맞팔확인 기능을 잠가두었습니다.</p>
     </div>
 
     <div id="checkContent">
-      <div class="section-heading">
-        <div>
-          <h2>맞팔확인</h2>
-          <p>ZIP 파일과 Sheet1 명단을 비교합니다.</p>
-        </div>
-        <button id="reloadForCheck" class="soft-btn">↻ 새로고침</button>
-      </div>
-
-      <div class="upload-card">
-        <label for="instagramZip">인스타그램 ZIP 파일 선택</label>
-        <input id="instagramZip" type="file" accept=".zip,application/zip">
-        <button id="analyzeButton" class="primary-btn">맞팔 분석 시작 →</button>
-        <p id="analyzeStatus">단톡방 명단을 불러온 뒤 ZIP 파일을 선택해 주세요.</p>
-      </div>
-
-      <div id="resultPanel" class="hidden">
-        <div class="section-heading">
-          <div><h2>분석 결과 요약</h2></div>
-          <button id="resetAnalysis" class="soft-btn">↻ 새로 분석</button>
+      <section class="card summary-card">
+        <div class="section-title">
+          <h1>분석 결과 요약</h1>
+          <button id="resetAnalysis" class="round-refresh" aria-label="다시 분석">↻</button>
         </div>
 
-        <div class="result-grid">
-          <div class="result-ok"><span>✓ 맞팔 완료</span><b id="mutualCount">0명</b></div>
-          <div><span>♙ 나만 팔로우 함</span><b id="onlyMeCount">0명</b></div>
-          <div><span>♙ 상대가 팔로우만 함</span><b id="onlyThemCount">0명</b></div>
-          <div><span>♙ 서로 팔로우 안 함</span><b id="neitherCount">0명</b></div>
+        <div class="metric-grid">
+          <div class="metric">
+            <span>맞팔 완료</span>
+            <b class="green" id="mutualCount">0명</b>
+            <small id="mutualPct">0%</small>
+          </div>
+          <div class="metric">
+            <span>나만 팔로우 함</span>
+            <b class="orange" id="onlyMeCount">0명</b>
+            <small id="onlyMePct">0%</small>
+          </div>
+          <div class="metric">
+            <span>상대가 팔로우만 함</span>
+            <b class="blue" id="onlyThemCount">0명</b>
+            <small id="onlyThemPct">0%</small>
+          </div>
+          <div class="metric">
+            <span>서로 팔로우 안 함</span>
+            <b class="gray" id="neitherCount">0명</b>
+            <small id="neitherPct">0%</small>
+          </div>
+        </div>
+
+        <div class="rate-line">
+          단톡방 맞팔률 <strong id="mutualRate">0%</strong>
+          <span>·</span>
+          <b id="rateFraction">0/0명</b>
+        </div>
+      </section>
+
+      <section class="card upload-search-card">
+        <div class="upload-box">
+          <label for="instagramZip">인스타그램 ZIP 파일 선택</label>
+          <input id="instagramZip" type="file" accept=".zip,application/zip">
+          <button id="analyzeButton" class="main-button">맞팔 분석 시작</button>
+          <p id="analyzeStatus">구글시트 명단을 불러오는 중입니다.</p>
         </div>
 
         <div class="search-box">
           <span>⌕</span>
-          <input id="checkSearch" placeholder="번호 · 닉네임 · 아이디 검색">
+          <input id="checkSearch" placeholder="아이디 또는 닉네임 검색">
         </div>
-        <div id="filterButtons" class="chip-row">
+
+        <div class="action-row">
+          <button id="copyMismatch" class="outline-btn">미맞팔 복사</button>
+        </div>
+
+        <div id="filterButtons" class="filter-row">
           <button class="active" data-filter="all">전체 (0)</button>
           <button data-filter="mutual">맞팔 (0)</button>
           <button data-filter="onlyMe">나만 팔로우 (0)</button>
@@ -105,56 +96,43 @@
           <button data-filter="neither">서로 안 함 (0)</button>
         </div>
 
-        <div class="check-head">
-          <span>번호</span><span>닉네임</span><span>아이디</span><span>상태</span><span>바로가기</span>
-        </div>
-        <div id="checkList" class="list-area"></div>
-      </div>
+        <div id="checkList" class="result-list"></div>
+      </section>
     </div>
   </section>
 
-  <section id="adminView" class="view hidden">
-    <div id="adminLoginBox" class="admin-login-card">
-      <h2>운영진 로그인</h2>
-      <p>운영진 전용 기능입니다.</p>
-      <div class="pin-row">
+  <section id="adminView" class="page hidden">
+    <section id="adminLoginBox" class="card admin-login">
+      <h1>운영진 로그인</h1>
+      <p>운영진 비밀번호를 입력해 주세요.</p>
+      <div class="password-row">
         <input id="adminPassword" type="password" inputmode="numeric" maxlength="4" placeholder="••••">
-        <button id="passwordToggle" class="soft-btn">보기</button>
+        <button id="passwordToggle" class="outline-btn">보기</button>
       </div>
-      <button id="adminLoginButton" class="primary-btn">로그인</button>
-    </div>
+      <button id="adminLoginButton" class="main-button">로그인</button>
+    </section>
 
-    <div id="adminPanel" class="hidden">
-      <div class="section-heading">
-        <div><h2>운영진 기능</h2></div>
-        <button id="adminLogoutButton" class="soft-btn">로그아웃</button>
-      </div>
-
-      <div class="admin-actions">
-        <a class="primary-btn as-link" href="https://docs.google.com/spreadsheets/d/1m14GywxIymZp6p9izJ6QVWaC8fCnjr5F5OdXCKKUcss/edit" target="_blank" rel="noopener">구글시트 열기</a>
-        <button id="adminReloadButton" class="soft-btn">명단 새로고침</button>
+    <section id="adminPanel" class="card hidden">
+      <div class="section-title">
+        <h1>운영진</h1>
+        <button id="adminLogoutButton" class="outline-btn">로그아웃</button>
       </div>
 
-      <hr>
+      <div class="admin-grid">
+        <a href="https://docs.google.com/spreadsheets/d/1m14GywxIymZp6p9izJ6QVWaC8fCnjr5F5OdXCKKUcss/edit" target="_blank" rel="noopener">📄<span>구글시트 열기</span></a>
+        <button id="adminReloadButton">↻<span>명단 새로고침</span></button>
+        <button id="toggleLockButton">🔒<span id="lockButtonText">맞팔 잠금 변경</span></button>
+      </div>
+
       <div class="admin-block">
-        <h3>맞팔확인 잠금 설정</h3>
-        <p>이 기기에서 맞팔확인 메뉴 사용을 잠그거나 해제합니다.</p>
-        <div class="lock-status-row">
-          <span id="lockStatusText">상태 확인 중</span>
-          <button id="toggleLockButton" class="primary-btn">잠금 변경</button>
-        </div>
-      </div>
-
-      <hr>
-      <div class="admin-block">
-        <h3>공지 작성</h3>
+        <h2>공지 작성</h2>
         <textarea id="noticeInput" rows="5" placeholder="공지 내용을 입력하세요"></textarea>
         <div class="two-buttons">
-          <button id="saveNoticeButton" class="primary-btn">공지 저장</button>
-          <button id="deleteNoticeButton" class="soft-btn">공지 삭제</button>
+          <button id="saveNoticeButton" class="main-button">공지 저장</button>
+          <button id="deleteNoticeButton" class="outline-btn">공지 삭제</button>
         </div>
       </div>
-    </div>
+    </section>
   </section>
 </main>
 
@@ -162,7 +140,5 @@
   <button class="active" data-view="check">↔<span>맞팔확인</span></button>
   <button data-view="admin">⚙<span>운영진</span></button>
 </footer>
-
-<div class="copyright">© 2026 YEOWOOBANG Version 243.0</div>
 </body>
 </html>

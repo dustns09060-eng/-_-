@@ -1,3 +1,3 @@
-const CACHE='yeowoobang-v243';
+const CACHE='yeowoobang-v244';
 self.addEventListener('install',e=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));

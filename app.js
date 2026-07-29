@@ -1,294 +1,136 @@
 const SHEET_ID="1m14GywxIymZp6p9izJ6QVWaC8fCnjr5F5OdXCKKUcss";
 const SHEET_NAME="Sheet1";
 const ADMIN_PASSWORD="0702";
-const PAGE_SIZE=500;
-
-let members=[];
-let currentPage="all";
-let followers=new Set();
-let following=new Set();
-let comparison=[];
-let activeFilter="all";
-
+let members=[],followers=new Set(),following=new Set(),comparison=[],activeFilter="all",deferredPrompt=null;
 const $=id=>document.getElementById(id);
-const normalize=v=>String(v||"").trim().replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//i,"").replace(/^_u\//i,"").split(/[/?#]/)[0].toLowerCase();
-const escapeHtml=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+const norm=v=>String(v||"").trim().replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//i,"").replace(/^_u\//i,"").split(/[/?#]/)[0].toLowerCase();
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 
 function switchView(view){
-  $("listView").classList.toggle("hidden",view!=="list");
   $("checkView").classList.toggle("hidden",view!=="check");
   $("adminView").classList.toggle("hidden",view!=="admin");
   document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-  if(view==="check") updateLockUi();
-  window.scrollTo(0,0);
+  if(view==="check") updateLock();
+  if(view==="admin"&&sessionStorage.getItem("admin")==="1") showAdmin();
+  scrollTo(0,0);
 }
-
-function fetchSheetJsonp(){
+function fetchSheet(){
   return new Promise((resolve,reject)=>{
-    const callback="sheetCallback_"+Date.now();
-    const script=document.createElement("script");
+    const cb="sheetcb_"+Date.now(),s=document.createElement("script");
     const timer=setTimeout(()=>{cleanup();reject(new Error("timeout"));},12000);
-    function cleanup(){clearTimeout(timer);try{delete window[callback];}catch(e){}script.remove();}
-    window[callback]=data=>{cleanup();resolve(data);};
-    script.onerror=()=>{cleanup();reject(new Error("load"));};
-    script.src="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?sheet="+encodeURIComponent(SHEET_NAME)+"&tqx=responseHandler:"+callback+";out:json&cache="+Date.now();
-    document.head.appendChild(script);
+    function cleanup(){clearTimeout(timer);try{delete window[cb]}catch(e){}s.remove()}
+    window[cb]=data=>{cleanup();resolve(data)};
+    s.onerror=()=>{cleanup();reject(new Error("load"))};
+    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=responseHandler:${cb};out:json&cache=${Date.now()}`;
+    document.head.appendChild(s);
   });
 }
-
 async function loadMembers(){
-  $("listStatus").textContent="명단을 불러오는 중입니다.";
+  $("analyzeStatus").textContent="구글시트 명단을 불러오는 중입니다.";
   try{
-    const json=await fetchSheetJsonp();
-    const rows=json.table?.rows||[];
-    members=rows.map(r=>{
+    const j=await fetchSheet();
+    members=(j.table?.rows||[]).map(r=>{
       const c=r.c||[];
-      return {
-        no:Number(String(c[0]?.v??"").replace(/[^0-9]/g,"")),
-        nickname:String(c[1]?.v??"").trim(),
-        id:normalize(c[2]?.v??"")
-      };
+      return {no:Number(String(c[0]?.v??"").replace(/[^0-9]/g,"")),nickname:String(c[1]?.v??"").trim(),id:norm(c[2]?.v??"")};
     }).filter(x=>x.no&&x.nickname&&x.id).sort((a,b)=>a.no-b.no);
-    $("totalPeople").textContent=members.length.toLocaleString()+"명";
-    $("totalPages").textContent=Math.ceil(members.length/PAGE_SIZE)+"개";
-    $("updatedAt").textContent=new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});
-    buildPageButtons();
-    renderMembers();
+    $("analyzeStatus").textContent=`명단 ${members.length.toLocaleString()}명을 불러왔습니다. ZIP 파일을 선택해 주세요.`;
     if(followers.size||following.size) buildComparison();
-  }catch(e){
-    $("listStatus").textContent="명단을 불러오지 못했습니다.";
-    $("memberList").innerHTML='<div class="empty">Google Sheet 공개 설정을 확인해 주세요.</div>';
-  }
+  }catch(e){$("analyzeStatus").textContent="명단을 불러오지 못했습니다. 구글시트 공개 설정을 확인해 주세요."}
 }
-
-function buildPageButtons(){
-  const count=Math.ceil(members.length/PAGE_SIZE);
-  let html='<button data-page="all" class="'+(currentPage==="all"?"active":"")+'">전체</button>';
-  for(let i=0;i<count;i++){
-    const start=i*PAGE_SIZE+1;
-    const end=Math.min((i+1)*PAGE_SIZE,members.length);
-    html+='<button data-page="'+i+'" class="'+(currentPage===i?"active":"")+'">'+start+"~"+end+"</button>";
-  }
-  $("pageButtons").innerHTML=html;
-}
-
-function renderMembers(){
-  const q=$("listSearch").value.toLowerCase().trim();
-  const filtered=members.filter(x=>{
-    const inPage=currentPage==="all"||(x.no>=currentPage*PAGE_SIZE+1&&x.no<=(currentPage+1)*PAGE_SIZE);
-    return inPage&&(x.no+" "+x.nickname+" "+x.id).toLowerCase().includes(q);
-  });
-  $("listStatus").textContent="검색 결과 "+filtered.length.toLocaleString()+"명";
-  $("memberList").innerHTML=filtered.length?filtered.map(x=>`
-    <div class="member-row">
-      <span>${x.no}</span>
-      <span class="nickname">${escapeHtml(x.nickname)}</span>
-      <span class="user-id">@${escapeHtml(x.id)}</span>
-      <a class="insta-link" target="_blank" rel="noopener" href="https://instagram.com/${encodeURIComponent(x.id)}">인스타</a>
-    </div>`).join(""):'<div class="empty">표시할 명단이 없습니다.</div>';
-}
-
 function parseHtml(text){
-  const doc=new DOMParser().parseFromString(text,"text/html");
-  const set=new Set();
+  const doc=new DOMParser().parseFromString(text,"text/html"),set=new Set();
   doc.querySelectorAll("a").forEach(a=>{
-    const href=a.getAttribute("href")||"";
-    const label=(a.textContent||"").trim();
-    const match=href.match(/instagram\.com\/(?:_u\/)?([^/?#]+)/i);
-    let id=match?match[1]:label;
-    id=normalize(id);
-    if(id&&/^[a-z0-9._]+$/.test(id)&&!["accounts","explore","p","reel"].includes(id)) set.add(id);
-  });
-  return set;
+    const href=a.getAttribute("href")||"",label=(a.textContent||"").trim(),m=href.match(/instagram\.com\/(?:_u\/)?([^/?#]+)/i);
+    const id=norm(m?m[1]:label);
+    if(id&&/^[a-z0-9._]+$/.test(id)&&!["accounts","explore","p","reel"].includes(id))set.add(id);
+  });return set;
 }
-
 function parseJson(text){
-  const set=new Set();
-  const data=JSON.parse(text);
-  function walk(value){
-    if(Array.isArray(value)){value.forEach(walk);return;}
-    if(!value||typeof value!=="object") return;
-    if(Array.isArray(value.string_list_data)){
-      value.string_list_data.forEach(item=>{
-        const id=normalize(item.value||item.href||"");
-        if(id&&/^[a-z0-9._]+$/.test(id)) set.add(id);
-      });
-    }
-    if(typeof value.title==="string"){
-      const id=normalize(value.title);
-      if(id&&/^[a-z0-9._]+$/.test(id)) set.add(id);
-    }
-    Object.values(value).forEach(walk);
-  }
-  walk(data);
-  return set;
+  const set=new Set(),data=JSON.parse(text);
+  function walk(v){
+    if(Array.isArray(v)){v.forEach(walk);return}
+    if(!v||typeof v!=="object")return;
+    if(Array.isArray(v.string_list_data))v.string_list_data.forEach(i=>{const id=norm(i.value||i.href||"");if(id&&/^[a-z0-9._]+$/.test(id))set.add(id)});
+    if(typeof v.title==="string"){const id=norm(v.title);if(id&&/^[a-z0-9._]+$/.test(id))set.add(id)}
+    Object.values(v).forEach(walk);
+  }walk(data);return set;
 }
-
-async function analyzeZip(){
-  if(isLocked()) return;
+async function analyze(){
+  if(isLocked())return;
   const file=$("instagramZip").files[0];
-  if(!file){alert("인스타그램 ZIP 파일을 선택해 주세요.");return;}
-  if(typeof JSZip==="undefined"){alert("ZIP 분석 도구를 불러오지 못했습니다.");return;}
-  $("analyzeStatus").textContent="ZIP 파일을 읽는 중입니다.";
+  if(!file){alert("ZIP 파일을 선택해 주세요.");return}
+  if(!members.length){alert("구글시트 명단을 먼저 불러와 주세요.");return}
   try{
-    const zip=await JSZip.loadAsync(file);
-    const names=Object.keys(zip.files).filter(name=>!zip.files[name].dir);
-    const followerFiles=names.filter(name=>/(^|\/)followers(_\d+)?\.(html|json)$/i.test(name));
-    const followingFiles=names.filter(name=>/(^|\/)following\.(html|json)$/i.test(name));
-    if(!followerFiles.length||!followingFiles.length) throw new Error("followers 또는 following 파일을 찾지 못했습니다.");
-
-    const f1=new Set(),f2=new Set();
-    for(const name of followerFiles){
-      const text=await zip.file(name).async("text");
-      const ids=/\.json$/i.test(name)?parseJson(text):parseHtml(text);
-      ids.forEach(id=>f1.add(id));
-    }
-    for(const name of followingFiles){
-      const text=await zip.file(name).async("text");
-      const ids=/\.json$/i.test(name)?parseJson(text):parseHtml(text);
-      ids.forEach(id=>f2.add(id));
-    }
-    followers=f1;following=f2;
+    $("analyzeStatus").textContent="ZIP 파일을 분석 중입니다.";
+    const zip=await JSZip.loadAsync(file),names=Object.keys(zip.files).filter(n=>!zip.files[n].dir);
+    const ff=names.filter(n=>/(^|\/)followers(_\d+)?\.(html|json)$/i.test(n));
+    const fg=names.filter(n=>/(^|\/)following\.(html|json)$/i.test(n));
+    if(!ff.length||!fg.length)throw new Error("followers 또는 following 파일을 찾지 못했습니다.");
+    followers=new Set();following=new Set();
+    for(const n of ff){const t=await zip.file(n).async("text"),ids=/\.json$/i.test(n)?parseJson(t):parseHtml(t);ids.forEach(id=>followers.add(id))}
+    for(const n of fg){const t=await zip.file(n).async("text"),ids=/\.json$/i.test(n)?parseJson(t):parseHtml(t);ids.forEach(id=>following.add(id))}
     buildComparison();
-    $("analyzeStatus").textContent="분석 완료 · 팔로워 "+followers.size.toLocaleString()+"명 / 팔로잉 "+following.size.toLocaleString()+"명";
-    $("resultPanel").classList.remove("hidden");
-  }catch(e){
-    $("analyzeStatus").textContent="분석에 실패했습니다.";
-    alert(e.message);
-  }
+    $("analyzeStatus").textContent=`분석 완료 · 팔로워 ${followers.size.toLocaleString()}명 / 팔로잉 ${following.size.toLocaleString()}명`;
+  }catch(e){$("analyzeStatus").textContent="분석에 실패했습니다.";alert(e.message)}
 }
-
 function buildComparison(){
   comparison=members.map(x=>{
-    const isFollower=followers.has(x.id);
-    const isFollowing=following.has(x.id);
-    let status="neither";
-    if(isFollower&&isFollowing) status="mutual";
-    else if(isFollowing) status="onlyMe";
-    else if(isFollower) status="onlyThem";
-    return {...x,status};
+    const a=followers.has(x.id),b=following.has(x.id);
+    return {...x,status:a&&b?"mutual":b?"onlyMe":a?"onlyThem":"neither"};
   });
-  const count=s=>comparison.filter(x=>x.status===s).length;
-  $("mutualCount").textContent=count("mutual").toLocaleString()+"명";
-  $("onlyMeCount").textContent=count("onlyMe").toLocaleString()+"명";
-  $("onlyThemCount").textContent=count("onlyThem").toLocaleString()+"명";
-  $("neitherCount").textContent=count("neither").toLocaleString()+"명";
-  document.querySelector('[data-filter="all"]').textContent="전체 ("+comparison.length+")";
-  document.querySelector('[data-filter="mutual"]').textContent="맞팔 ("+count("mutual")+")";
-  document.querySelector('[data-filter="onlyMe"]').textContent="나만 팔로우 ("+count("onlyMe")+")";
-  document.querySelector('[data-filter="onlyThem"]').textContent="상대만 팔로우 ("+count("onlyThem")+")";
-  document.querySelector('[data-filter="neither"]').textContent="서로 안 함 ("+count("neither")+")";
-  renderComparison();
+  const total=comparison.length||1,count=s=>comparison.filter(x=>x.status===s).length,pct=n=>(n/total*100).toFixed(1)+"%";
+  const vals={mutual:count("mutual"),onlyMe:count("onlyMe"),onlyThem:count("onlyThem"),neither:count("neither")};
+  for(const k of Object.keys(vals)){const id=k==="mutual"?"mutual":k;$((id)+"Count").textContent=vals[k].toLocaleString()+"명";$((id)+"Pct").textContent=pct(vals[k])}
+  $("mutualRate").textContent=pct(vals.mutual);$("rateFraction").textContent=`${vals.mutual}/${comparison.length}명`;
+  document.querySelector('[data-filter="all"]').textContent=`전체 (${comparison.length})`;
+  document.querySelector('[data-filter="mutual"]').textContent=`맞팔 (${vals.mutual})`;
+  document.querySelector('[data-filter="onlyMe"]').textContent=`나만 팔로우 (${vals.onlyMe})`;
+  document.querySelector('[data-filter="onlyThem"]').textContent=`상대만 팔로우 (${vals.onlyThem})`;
+  document.querySelector('[data-filter="neither"]').textContent=`서로 안 함 (${vals.neither})`;
+  renderResults();
 }
-
-function statusLabel(status){
-  return {mutual:"맞팔",onlyMe:"나만",onlyThem:"상대만",neither:"서로 안 함"}[status];
-}
-
-function renderComparison(){
+function label(s){return {mutual:"맞팔 완료",onlyMe:"나만 팔로우 함",onlyThem:"상대가 팔로우만 함",neither:"서로 팔로우 안 함"}[s]}
+function renderResults(){
   const q=$("checkSearch").value.toLowerCase().trim();
   const rows=comparison.filter(x=>(activeFilter==="all"||x.status===activeFilter)&&(x.no+" "+x.nickname+" "+x.id).toLowerCase().includes(q));
   $("checkList").innerHTML=rows.length?rows.map(x=>`
-    <div class="check-row">
-      <span>${x.no}</span>
-      <span class="nickname">${escapeHtml(x.nickname)}</span>
-      <span class="user-id">@${escapeHtml(x.id)}</span>
-      <span class="status-badge status-${x.status}">${statusLabel(x.status)}</span>
-      <a class="insta-link" target="_blank" rel="noopener" href="https://instagram.com/${encodeURIComponent(x.id)}">인스타</a>
+    <div class="result-item">
+      <div class="result-no">${x.no}</div>
+      <div class="result-main">
+        <strong>${esc(x.nickname)}</strong>
+        <b>@${esc(x.id)}</b>
+        <small class="status-${x.status}">${label(x.status)}</small>
+      </div>
+      <a class="open-btn" href="https://instagram.com/${encodeURIComponent(x.id)}" target="_blank" rel="noopener">↗ 열기</a>
     </div>`).join(""):'<div class="empty">표시할 결과가 없습니다.</div>';
 }
+function resetAnalysis(){followers=new Set();following=new Set();comparison=[];$("instagramZip").value="";$("checkList").innerHTML="";["mutual","onlyMe","onlyThem","neither"].forEach(k=>{$(k+"Count").textContent="0명";$(k+"Pct").textContent="0%"});$("mutualRate").textContent="0%";$("rateFraction").textContent="0/0명";$("analyzeStatus").textContent="ZIP 파일을 선택해 주세요."}
+function copyMismatch(){
+  const ids=comparison.filter(x=>x.status!=="mutual").map(x=>`${x.no}. ${x.nickname} @${x.id} - ${label(x.status)}`).join("\n");
+  if(!ids){alert("복사할 미맞팔 결과가 없습니다.");return}
+  navigator.clipboard.writeText(ids).then(()=>alert("미맞팔 명단을 복사했습니다."));
+}
+function isLocked(){return localStorage.getItem("yeowooCheckLocked")!=="0"}
+function updateLock(){
+  const locked=isLocked();$("checkLockPanel").classList.toggle("hidden",!locked);$("checkContent").classList.toggle("hidden",locked);$("lockButtonText").textContent=locked?"맞팔 잠금 해제":"맞팔 잠그기";
+}
+function toggleLock(){localStorage.setItem("yeowooCheckLocked",isLocked()?"0":"1");updateLock();alert(isLocked()?"맞팔확인을 잠갔습니다.":"맞팔확인 잠금을 해제했습니다.")}
+function showAdmin(){$("adminLoginBox").classList.add("hidden");$("adminPanel").classList.remove("hidden");updateLock()}
+function login(){if($("adminPassword").value===ADMIN_PASSWORD){sessionStorage.setItem("admin","1");showAdmin()}else{alert("비밀번호가 틀렸습니다.");$("adminPassword").value=""}}
+function logout(){sessionStorage.removeItem("admin");$("adminPanel").classList.add("hidden");$("adminLoginBox").classList.remove("hidden")}
+function renderNotice(){const n=localStorage.getItem("yeowooNotice")||"";$("noticeBar").classList.toggle("hidden",!n);$("noticeText").textContent=n;$("noticeInput").value=n}
+function saveNotice(){localStorage.setItem("yeowooNotice",$("noticeInput").value.trim());renderNotice();alert("공지를 저장했습니다.")}
+function deleteNotice(){localStorage.removeItem("yeowooNotice");renderNotice();alert("공지를 삭제했습니다.")}
 
-function isLocked(){return localStorage.getItem("yeowooCheckLocked")!=="0";}
-function updateLockUi(){
-  const locked=isLocked();
-  $("checkLockPanel").classList.toggle("hidden",!locked);
-  $("checkContent").classList.toggle("hidden",locked);
-  $("lockStatusText").textContent=locked?"현재 상태: 잠금":"현재 상태: 사용 가능";
-  $("toggleLockButton").textContent=locked?"맞팔확인 잠금 해제":"맞팔확인 잠그기";
-}
-function toggleLock(){
-  const willLock=!isLocked();
-  localStorage.setItem("yeowooCheckLocked",willLock?"1":"0");
-  updateLockUi();
-  alert(willLock?"맞팔확인을 잠갔습니다.":"맞팔확인 잠금을 해제했습니다.");
-}
-
-function showAdmin(){
-  $("adminLoginBox").classList.add("hidden");
-  $("adminPanel").classList.remove("hidden");
-  updateLockUi();
-}
-function loginAdmin(){
-  if($("adminPassword").value===ADMIN_PASSWORD){
-    sessionStorage.setItem("yeowooAdmin","1");
-    showAdmin();
-  }else{
-    alert("비밀번호가 틀렸습니다.");
-    $("adminPassword").value="";
-    $("adminPassword").focus();
-  }
-}
-function logoutAdmin(){
-  sessionStorage.removeItem("yeowooAdmin");
-  $("adminPanel").classList.add("hidden");
-  $("adminLoginBox").classList.remove("hidden");
-  $("adminPassword").value="";
-}
-
-function renderNotice(){
-  const notice=localStorage.getItem("yeowooNotice")||"";
-  $("noticeBar").classList.toggle("hidden",!notice);
-  $("noticeText").textContent=notice;
-  $("noticeInput").value=notice;
-}
-function saveNotice(){
-  localStorage.setItem("yeowooNotice",$("noticeInput").value.trim());
-  renderNotice();
-  alert("공지를 저장했습니다.");
-}
-function deleteNotice(){
-  localStorage.removeItem("yeowooNotice");
-  renderNotice();
-  alert("공지를 삭제했습니다.");
-}
-
-document.addEventListener("click",event=>{
-  const view=event.target.closest("[data-view]")?.dataset.view;
-  if(view){
-    switchView(view);
-    if(view==="admin"&&sessionStorage.getItem("yeowooAdmin")==="1") showAdmin();
-  }
-  const page=event.target.closest("[data-page]")?.dataset.page;
-  if(page!==undefined){
-    currentPage=page==="all"?"all":Number(page);
-    buildPageButtons();renderMembers();
-  }
-  const filter=event.target.closest("[data-filter]")?.dataset.filter;
-  if(filter){
-    activeFilter=filter;
-    document.querySelectorAll("[data-filter]").forEach(b=>b.classList.remove("active"));
-    event.target.closest("[data-filter]").classList.add("active");
-    renderComparison();
-  }
+document.addEventListener("click",e=>{
+  const view=e.target.closest("[data-view]")?.dataset.view;if(view)switchView(view);
+  const filter=e.target.closest("[data-filter]")?.dataset.filter;
+  if(filter){activeFilter=filter;document.querySelectorAll("[data-filter]").forEach(b=>b.classList.remove("active"));e.target.closest("[data-filter]").classList.add("active");renderResults()}
 });
-
-$("reloadList").onclick=loadMembers;
-$("reloadForCheck").onclick=loadMembers;
-$("adminReloadButton").onclick=loadMembers;
-$("listSearch").oninput=renderMembers;
-$("checkSearch").oninput=renderComparison;
-$("analyzeButton").onclick=analyzeZip;
-$("resetAnalysis").onclick=()=>{followers=new Set();following=new Set();comparison=[];$("resultPanel").classList.add("hidden");$("instagramZip").value="";$("analyzeStatus").textContent="단톡방 명단을 불러온 뒤 ZIP 파일을 선택해 주세요.";}
-$("adminLoginButton").onclick=loginAdmin;
-$("adminPassword").onkeydown=e=>{if(e.key==="Enter")loginAdmin();};
-$("passwordToggle").onclick=()=>{const visible=$("adminPassword").type==="text";$("adminPassword").type=visible?"password":"text";$("passwordToggle").textContent=visible?"보기":"숨김";};
-$("adminLogoutButton").onclick=logoutAdmin;
-$("toggleLockButton").onclick=toggleLock;
-$("saveNoticeButton").onclick=saveNotice;
-$("deleteNoticeButton").onclick=deleteNotice;
-$("noticeClose").onclick=()=>$("noticeBar").classList.add("hidden");
-
-renderNotice();
-updateLockUi();
-switchView("check");
-loadMembers();
+$("analyzeButton").onclick=analyze;$("resetAnalysis").onclick=resetAnalysis;$("checkSearch").oninput=renderResults;$("copyMismatch").onclick=copyMismatch;
+$("adminReloadButton").onclick=loadMembers;$("adminLoginButton").onclick=login;$("adminPassword").onkeydown=e=>{if(e.key==="Enter")login()};$("adminLogoutButton").onclick=logout;
+$("passwordToggle").onclick=()=>{const v=$("adminPassword").type==="text";$("adminPassword").type=v?"password":"text";$("passwordToggle").textContent=v?"보기":"숨김"};
+$("toggleLockButton").onclick=toggleLock;$("saveNoticeButton").onclick=saveNotice;$("deleteNoticeButton").onclick=deleteNotice;$("noticeClose").onclick=()=>$("noticeBar").classList.add("hidden");
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installButton").classList.remove("hidden")});
+$("installButton").onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installButton").classList.add("hidden")};
+renderNotice();updateLock();loadMembers();
