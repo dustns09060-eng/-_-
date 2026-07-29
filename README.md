@@ -15,3 +15,9 @@
 
 ## 확인 주소
 https://dustns09060-eng.github.io/-_-/?v=320
+
+
+## Google Sheet 변경본
+- Spreadsheet ID: `1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg`
+- GID: `1547262511`
+- V32 디자인과 기능은 그대로 유지하고 Google Sheet 연결만 변경했습니다.
