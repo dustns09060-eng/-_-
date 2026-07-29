@@ -14,10 +14,10 @@ let matchGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V32";
+const APP_VERSION = "V33";
 
 let config = {
-  version: "V32 POLISHED UI",
+  version: "V33 SHEET ROSTER FINAL",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -399,18 +399,16 @@ function rowsToRoom(rows) {
     });
   });
 
-  const seenRows = new Set();
+  // 인스타 아이디가 같더라도 서로 다른 회원 번호라면 각각 한 명으로 계산합니다.
+  // 시트의 회원 번호를 기준으로만 중복 행을 제거합니다.
+  const seenNumbers = new Set();
   return list
     .filter((item) => {
-      if (!item.name || !item.id) return false;
-      if (/^\d+$/.test(item.id)) return false;
-      const key = `${item.no}|${item.name}|${item.id}`;
-      if (seenRows.has(key)) return false;
-      seenRows.add(key);
+      if (seenNumbers.has(item.no)) return false;
+      seenNumbers.add(item.no);
       return true;
     })
-    .sort((a, b) => a.no - b.no)
-    .slice(0, 2132);
+    .sort((a, b) => a.no - b.no);
 }
 
 async function loadRoomList(show = false) {

@@ -1,16 +1,16 @@
-const CACHE='yb-v328-actual-2132';
+const CACHE='yb-v330-roster-final';
 const ASSETS=[
   './',
   './index.html',
-  './style.css?v=328',
-  './app.js?v=328',
-  './manifest.json?v=328',
-  './config.json?v=328',
-  './favicon-v20.png?v=328',
-  './icon-192-v20.png?v=328',
-  './icon-512-v20.png?v=328',
-  './app-logo-v20.png?v=328',
-  './preview-v26.png?v=328',
+  './style.css?v=330',
+  './app.js?v=330',
+  './manifest.json?v=330',
+  './config.json?v=330',
+  './favicon-v20.png?v=330',
+  './icon-192-v20.png?v=330',
+  './icon-512-v20.png?v=330',
+  './app-logo-v20.png?v=330',
+  './preview-v26.png?v=330',
   './room-list.csv'
 ];
 self.addEventListener('install',event=>{
