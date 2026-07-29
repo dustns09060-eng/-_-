@@ -419,15 +419,9 @@ async function loadRoomList(show = false) {
 
   const urls = [];
   if (config.sheetId) {
-    const gid = encodeURIComponent(config.sheetGid || "");
     const sheet = encodeURIComponent(config.sheetName || "Sheet1");
-    if (gid) {
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&t=${Date.now()}`);
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&gid=${gid}&t=${Date.now()}`);
-    } else {
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
-    }
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&gid=1547262511&t=${Date.now()}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&gid=1547262511&t=${Date.now()}`);
   }
   urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
 

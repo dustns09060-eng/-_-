@@ -4,6 +4,5 @@
   "apiUrl": "",
   "sheetId": "1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg",
   "sheetName": "Sheet1",
-  "fallbackCsv": "room-list.csv",
-  "sheetGid": "1547262511"
+  "fallbackCsv": "room-list.csv"
 }
