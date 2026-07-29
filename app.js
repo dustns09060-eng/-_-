@@ -399,10 +399,9 @@ function rowsToRoom(rows) {
     });
   });
 
-  const seen = new Set();
-  return list
-    .filter((item) => !seen.has(item.id) && seen.add(item.id))
-    .sort((a, b) => a.no - b.no);
+  // 같은 인스타 아이디가 여러 번호에 있어도 각각의 명단 인원으로 계산합니다.
+  // 따라서 중복 아이디를 제거하지 않고 시트의 실제 명단 행 수를 그대로 표시합니다.
+  return list.sort((a, b) => a.no - b.no);
 }
 
 async function loadRoomList(show = false) {
