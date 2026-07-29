@@ -15,3 +15,10 @@
 
 ## 확인 주소
 https://dustns09060-eng.github.io/-_-/?v=320
+
+
+## V32.1 팔로우리스트 전용 비밀번호
+- 팔로우리스트 진입 시 별도 비밀번호 입력
+- 운영진 화면에서 전용 비밀번호 변경
+- 운영진은 잠금 없이 바로 열람
+- Apps Script 반영 방법은 `APPS_SCRIPT_FOLLOW_PASSWORD_PATCH.md` 참고
