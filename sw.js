@@ -1,16 +1,16 @@
-const CACHE='yb-v325-followlist-sheet';
+const CACHE='yb-v326-correct-count';
 const ASSETS=[
   './',
   './index.html',
-  './style.css?v=325',
-  './app.js?v=325',
-  './manifest.json?v=325',
-  './config.json?v=325',
-  './favicon-v20.png?v=325',
-  './icon-192-v20.png?v=325',
-  './icon-512-v20.png?v=325',
-  './app-logo-v20.png?v=325',
-  './preview-v26.png?v=325',
+  './style.css?v=326',
+  './app.js?v=326',
+  './manifest.json?v=326',
+  './config.json?v=326',
+  './favicon-v20.png?v=326',
+  './icon-192-v20.png?v=326',
+  './icon-512-v20.png?v=326',
+  './app-logo-v20.png?v=326',
+  './preview-v26.png?v=326',
   './room-list.csv'
 ];
 self.addEventListener('install',event=>{

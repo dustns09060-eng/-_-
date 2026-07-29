@@ -375,41 +375,45 @@ function parseCsv(text) {
 
 function rowsToRoom(rows) {
   const list = [];
-  rows.forEach((row, index) => {
-    const joined = row.join(" ");
-    if (index === 0 && (joined.includes("번호") || joined.includes("닉네임") || joined.includes("아이디"))) return;
 
-    const id = normalize(row[2] || row[1] || row[0]);
-    if (validUsername(id)) {
-      list.push({
-        no: row[0] || list.length + 1,
-        name: row[1] || "",
-        id,
-      });
-    }
+  rows.forEach((row) => {
+    const noText = String(row[0] || "").trim();
+    const name = String(row[1] || "").trim();
+    const rawId = String(row[2] || "").trim();
+    const id = normalize(rawId);
+
+    // 실제 명단 행만 인정:
+    // 1열 번호, 2열 닉네임, 3열 인스타 아이디가 모두 있어야 합니다.
+    if (!/^\d+$/.test(noText)) return;
+    if (!name || ["닉네임", "이름"].includes(name)) return;
+    if (!rawId || ["아이디", "인스타아이디", "인스타 아이디"].includes(rawId.replace(/\s/g, ""))) return;
+    if (!validUsername(id)) return;
+
+    // 인원수·페이지수 같은 숫자 요약 셀이 아이디로 들어오는 현상 방지
+    if (/^\d+$/.test(id)) return;
+
+    list.push({
+      no: Number(noText),
+      name,
+      id,
+    });
   });
 
   const seen = new Set();
-  return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
+  return list
+    .filter((item) => !seen.has(item.id) && seen.add(item.id))
+    .sort((a, b) => a.no - b.no);
 }
 
 async function loadRoomList(show = false) {
   setSheetState("불러오는 중");
   let lastError = "";
 
-  // 팔로우리스트 명단만 새 Google Sheet에서 직접 불러옵니다.
-  // 접속 비밀번호, 운영진, 공지, 잠금 기능은 기존 API를 그대로 사용합니다.
   const urls = [];
   if (config.sheetId) {
     const gid = encodeURIComponent(config.sheetGid || "1547262511");
-    const sheet = encodeURIComponent(config.sheetName || "Sheet1");
-    if (gid) {
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&t=${Date.now()}`);
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&gid=${gid}&t=${Date.now()}`);
-    } else {
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
-      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
-    }
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&t=${Date.now()}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&gid=${gid}&t=${Date.now()}`);
   }
   urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
 
@@ -417,14 +421,21 @@ async function loadRoomList(show = false) {
     try {
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
       const list = rowsToRoom(parseCsv(await response.text()));
-      if (!list.length) throw new Error("0명");
+      if (!list.length) throw new Error("명단 0명");
+
       roomList = list;
       setSheetState(url.includes("docs.google.com") ? "정상" : "백업");
       updateFollowStats();
       renderGroupTabs();
       renderFollowList();
-      if (show) toast(url.includes("docs.google.com") ? "팔로우리스트 새로고침 완료" : "백업 명단으로 불러왔습니다.");
+
+      if (show) {
+        toast(url.includes("docs.google.com")
+          ? `명단 ${roomList.length}명 새로고침 완료`
+          : "백업 명단으로 불러왔습니다.");
+      }
       return;
     } catch (error) {
       lastError = error.message;

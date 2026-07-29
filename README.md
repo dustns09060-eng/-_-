@@ -15,11 +15,3 @@
 
 ## 확인 주소
 https://dustns09060-eng.github.io/-_-/?v=320
-
-
-## 팔로우리스트 시트만 변경
-- 팔로우리스트 데이터: 새 Google Sheet에서 직접 불러옴
-- Spreadsheet ID: `1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg`
-- GID: `1547262511`
-- 접속 비밀번호, 운영진 로그인, 공지, 잠금 기능: 기존 API 그대로 유지
-- 디자인과 화면 구성: V32 원본 그대로 유지
