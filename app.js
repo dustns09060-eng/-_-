@@ -15,7 +15,7 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V32.1";
+const APP_VERSION = "V32";
 
 let config = {
   version: "V32 POLISHED UI",
@@ -268,6 +268,7 @@ async function refreshPublicConfig(recheck = true) {
   const previousSecurity = securityVersion || publicConfig?.securityVersion || "";
   publicConfig = await apiGet("publicConfig");
   updateLockIndicators();
+  applyFollowLock();
   applyMatchLock();
   checkVersionUpdate();
 
@@ -297,6 +298,7 @@ function checkVersionUpdate() {
 function updateLockIndicators() {
   const appLocked = Boolean(publicConfig?.appLocked);
   const matchLocked = Boolean(publicConfig?.matchLocked);
+  const followLocked = Boolean(publicConfig?.followLocked);
 
   if ($("appLockState")) {
     $("appLockState").textContent = appLocked ? "잠금 중" : "사용 가능";
@@ -307,12 +309,17 @@ function updateLockIndicators() {
     $("matchLockState").textContent = matchLocked ? "잠금 중" : "사용 가능";
     $("matchLockState").className = `lock-state ${matchLocked ? "locked" : "unlocked"}`;
   }
+
+  if ($("followLockState")) {
+    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
+    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
+  }
 }
 
 function applyFollowLock() {
-  const locked = !followGranted && !adminLoggedIn;
-  $("followLockCard").classList.toggle("hidden", !locked);
-  $("followContent").classList.toggle("hidden", locked);
+  const locked = Boolean(publicConfig?.followLocked) && !followGranted && !adminLoggedIn;
+  $("followLockCard")?.classList.toggle("hidden", !locked);
+  $("followContent")?.classList.toggle("hidden", locked);
 }
 
 async function unlockFollow() {
@@ -935,6 +942,8 @@ $("adminRefreshBtn").onclick = async () => {
 
 $("lockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: true }, "앱을 잠갔습니다.");
 $("unlockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: false }, "앱 잠금을 해제했습니다.");
+$("lockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: true }, "팔로우리스트를 잠갔습니다.");
+$("unlockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: false }, "팔로우리스트 잠금을 해제했습니다.");
 $("lockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: true }, "맞팔확인을 잠갔습니다.");
 $("unlockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: false }, "맞팔확인 잠금을 해제했습니다.");
 
@@ -973,7 +982,6 @@ $("installBtn").onclick = async () => {
 
 window.addEventListener("DOMContentLoaded", async () => {
   await loadConfig();
-  applyFollowLock();
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {

@@ -1,16 +1,16 @@
-const CACHE='yb-v321-follow-password';
+const CACHE='yb-v322';
 const ASSETS=[
   './',
   './index.html',
-  './style.css?v=321',
-  './app.js?v=321',
-  './manifest.json?v=321',
-  './config.json?v=321',
-  './favicon-v20.png?v=321',
-  './icon-192-v20.png?v=321',
-  './icon-512-v20.png?v=321',
-  './app-logo-v20.png?v=321',
-  './preview-v26.png?v=321',
+  './style.css?v=322',
+  './app.js?v=322',
+  './manifest.json?v=322',
+  './config.json?v=322',
+  './favicon-v20.png?v=322',
+  './icon-192-v20.png?v=322',
+  './icon-512-v20.png?v=322',
+  './app-logo-v20.png?v=322',
+  './preview-v26.png?v=322',
   './room-list.csv'
 ];
 self.addEventListener('install',event=>{
