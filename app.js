@@ -1,5 +1,5 @@
-const SHEET_ID="1m14GywxIymZp6p9izJ6QVWaC8fCnjr5F5OdXCKKUcss";
-const SHEET_NAME="Sheet1";
+const SHEET_ID="1QfguFyvtgNUyfd4-ufMxAWRwItHuIY6M4wGAQstteW0";
+const SHEET_NAME="Sheet2";
 const ADMIN_PASSWORD="0702";
 let members=[],followers=new Set(),following=new Set(),comparison=[],activeFilter="all",deferredPrompt=null;
 const $=id=>document.getElementById(id);
