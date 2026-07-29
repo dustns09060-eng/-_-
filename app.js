@@ -397,31 +397,19 @@ async function loadRoomList(show = false) {
   setSheetState("불러오는 중");
   let lastError = "";
 
-  try {
-    const data = await apiGet("roomList");
-    roomList = (data.members || []).map((item, index) => ({
-      no: item.no || index + 1,
-      name: item.name || "",
-      id: normalize(item.id),
-    })).filter((item) => validUsername(item.id));
-
-    if (!roomList.length) throw new Error("API 명단 0명");
-
-    setSheetState("정상");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-    if (show) toast("명단 새로고침 완료");
-    return;
-  } catch (error) {
-    lastError = error.message;
-  }
-
+  // 팔로우리스트 명단만 새 Google Sheet에서 직접 불러옵니다.
+  // 접속 비밀번호, 운영진, 공지, 잠금 기능은 기존 API를 그대로 사용합니다.
   const urls = [];
   if (config.sheetId) {
+    const gid = encodeURIComponent(config.sheetGid || "1547262511");
     const sheet = encodeURIComponent(config.sheetName || "Sheet1");
-    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
-    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
+    if (gid) {
+      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&t=${Date.now()}`);
+      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&gid=${gid}&t=${Date.now()}`);
+    } else {
+      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
+      urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
+    }
   }
   urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
 
@@ -432,11 +420,11 @@ async function loadRoomList(show = false) {
       const list = rowsToRoom(parseCsv(await response.text()));
       if (!list.length) throw new Error("0명");
       roomList = list;
-      setSheetState("백업");
+      setSheetState(url.includes("docs.google.com") ? "정상" : "백업");
       updateFollowStats();
       renderGroupTabs();
       renderFollowList();
-      if (show) toast("백업 명단으로 불러왔습니다.");
+      if (show) toast(url.includes("docs.google.com") ? "팔로우리스트 새로고침 완료" : "백업 명단으로 불러왔습니다.");
       return;
     } catch (error) {
       lastError = error.message;
