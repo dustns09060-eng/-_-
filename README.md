@@ -15,9 +15,3 @@
 
 ## 확인 주소
 https://dustns09060-eng.github.io/-_-/?v=320
-
-## V32.2 팔로우리스트 전용 잠금
-- 팔로우리스트에도 맞팔확인과 동일한 잠금 카드 적용
-- 운영진 화면에 잠그기/잠금 해제/비밀번호 변경 추가
-- 비밀번호와 잠금 상태는 Google Sheet `설정` 탭에서 관리
-- Apps Script 반영 방법은 `APPS_SCRIPT_GOOGLE_SHEET_PATCH.md` 참고
