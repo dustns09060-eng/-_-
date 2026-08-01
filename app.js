@@ -11,10 +11,14 @@ let publicConfig = null;
 let accessGranted = false;
 let appLockGranted = false;
 let matchGranted = false;
+let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V32";
+const APP_VERSION = "V33";
+const ROOM_CACHE_KEY = "yb_room_list_v33";
+const ROOM_CACHE_TIME_KEY = "yb_room_list_time_v33";
+const ROOM_CACHE_MAX_AGE = 10 * 60 * 1000;
 
 let config = {
   version: "V32 POLISHED UI",
@@ -238,6 +242,7 @@ async function submitGatePassword() {
       adminPasswordValue = password;
       accessGranted = true;
       matchGranted = true;
+      followGranted = true;
       setAdminNavigation(true);
       hideGate();
       await loadAfterAuth();
@@ -257,7 +262,22 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  await Promise.allSettled([loadRoomList(false), loadNotices(false), refreshPublicConfig(false)]);
+  const cached = restoreRoomCache();
+  if (cached) {
+    setSheetState("캐시");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+  }
+
+  await Promise.allSettled([loadNotices(false), refreshPublicConfig(false)]);
+
+  if (cached) {
+    refreshRoomListRemote(false).catch(() => {});
+  } else {
+    await refreshRoomListRemote(false);
+  }
+
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
 }
@@ -275,6 +295,7 @@ async function refreshPublicConfig(recheck = true) {
     accessGranted = false;
     appLockGranted = false;
     matchGranted = false;
+    followGranted = false;
     toast("보안 설정이 변경되어 다시 로그인합니다.");
     setAdminNavigation(false);
     await bootstrapAuth();
@@ -293,6 +314,7 @@ function checkVersionUpdate() {
 
 function updateLockIndicators() {
   const appLocked = Boolean(publicConfig?.appLocked);
+  const followLocked = Boolean(publicConfig?.followLocked);
   const matchLocked = Boolean(publicConfig?.matchLocked);
 
   if ($("appLockState")) {
@@ -300,9 +322,39 @@ function updateLockIndicators() {
     $("appLockState").className = `lock-state ${appLocked ? "locked" : "unlocked"}`;
   }
 
+  if ($("followLockState")) {
+    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
+    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
+  }
+
   if ($("matchLockState")) {
     $("matchLockState").textContent = matchLocked ? "잠금 중" : "사용 가능";
     $("matchLockState").className = `lock-state ${matchLocked ? "locked" : "unlocked"}`;
+  }
+}
+
+function applyFollowLock() {
+  const locked = Boolean(publicConfig?.followLocked) && !followGranted && !adminLoggedIn;
+  $("followLockCard").classList.toggle("hidden", !locked);
+  $("followContent").classList.toggle("hidden", locked);
+}
+
+async function unlockFollow() {
+  const password = $("followPassword").value.trim();
+  if (!password) {
+    $("followUnlockMsg").textContent = "비밀번호를 입력해 주세요.";
+    return;
+  }
+
+  try {
+    await apiPost("verifyFollowPassword", { password });
+    followGranted = true;
+    $("followUnlockMsg").textContent = "";
+    $("followPassword").value = "";
+    applyFollowLock();
+    toast("팔로우리스트 잠금이 해제되었습니다.");
+  } catch (_) {
+    $("followUnlockMsg").textContent = "팔로우리스트 비밀번호가 올바르지 않습니다.";
   }
 }
 
@@ -393,26 +445,60 @@ function rowsToRoom(rows) {
   return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
 }
 
-async function loadRoomList(show = false) {
+function restoreRoomCache() {
+  try {
+    const raw = localStorage.getItem(ROOM_CACHE_KEY);
+    if (!raw) return false;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list) || !list.length) return false;
+    roomList = list.filter(item => item && validUsername(normalize(item.id))).map((item, index) => ({
+      no: item.no || index + 1,
+      name: item.name || "",
+      id: normalize(item.id),
+    }));
+    return roomList.length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+function saveRoomCache() {
+  try {
+    localStorage.setItem(ROOM_CACHE_KEY, JSON.stringify(roomList));
+    localStorage.setItem(ROOM_CACHE_TIME_KEY, String(Date.now()));
+  } catch (_) {}
+}
+
+function roomCacheIsFresh() {
+  const time = Number(localStorage.getItem(ROOM_CACHE_TIME_KEY) || 0);
+  return Boolean(time && Date.now() - time < ROOM_CACHE_MAX_AGE);
+}
+
+async function refreshRoomListRemote(show = false) {
   setSheetState("불러오는 중");
   let lastError = "";
 
   try {
     const data = await apiGet("roomList");
-    roomList = (data.members || []).map((item, index) => ({
+    const nextList = (data.members || []).map((item, index) => ({
       no: item.no || index + 1,
       name: item.name || "",
       id: normalize(item.id),
     })).filter((item) => validUsername(item.id));
 
-    if (!roomList.length) throw new Error("API 명단 0명");
+    if (!nextList.length) throw new Error("API 명단 0명");
 
+    const changed = JSON.stringify(nextList) !== JSON.stringify(roomList);
+    roomList = nextList;
+    saveRoomCache();
     setSheetState("정상");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
+    if (changed || !$("followList").children.length) {
+      updateFollowStats();
+      renderGroupTabs();
+      renderFollowList();
+    }
     if (show) toast("명단 새로고침 완료");
-    return;
+    return true;
   } catch (error) {
     lastError = error.message;
   }
@@ -431,26 +517,55 @@ async function loadRoomList(show = false) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const list = rowsToRoom(parseCsv(await response.text()));
       if (!list.length) throw new Error("0명");
+      const changed = JSON.stringify(list) !== JSON.stringify(roomList);
       roomList = list;
+      saveRoomCache();
       setSheetState("백업");
-      updateFollowStats();
-      renderGroupTabs();
-      renderFollowList();
+      if (changed || !$("followList").children.length) {
+        updateFollowStats();
+        renderGroupTabs();
+        renderFollowList();
+      }
       if (show) toast("백업 명단으로 불러왔습니다.");
-      return;
+      return true;
     } catch (error) {
       lastError = error.message;
     }
   }
 
+  if (roomList.length) {
+    setSheetState("캐시");
+    if (show) toast("저장된 명단을 표시합니다.");
+    return false;
+  }
+
   setSheetState("오류");
   $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
   if (show) toast("명단 불러오기 실패");
+  return false;
+}
+
+async function loadRoomList(show = false, force = false) {
+  const restored = roomList.length > 0 || restoreRoomCache();
+  if (restored) {
+    setSheetState("캐시");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+  }
+
+  if (!force && restored && roomCacheIsFresh()) {
+    refreshRoomListRemote(false).catch(() => {});
+    if (show) toast("저장된 명단을 빠르게 불러왔습니다.");
+    return;
+  }
+
+  await refreshRoomListRemote(show);
 }
 
 function setSheetState(state) {
   if ($("roomState")) {
-    $("roomState").textContent = state === "정상" || state === "백업" ? `${roomList.length}명 준비 완료` : state;
+    $("roomState").textContent = state === "정상" || state === "백업" || state === "캐시" ? `${roomList.length}명 준비 완료` : state;
   }
   if ($("adminApiState")) $("adminApiState").textContent = state;
 }
@@ -509,6 +624,7 @@ function renderFollowList() {
 function showView(id) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === id));
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === id));
+  if (id === "followView") applyFollowLock();
   if (id === "matchView") applyMatchLock();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -691,26 +807,6 @@ async function copyCurrent() {
   toast("복사 완료");
 }
 
-function downloadCsv() {
-  const items = matchFiltered();
-  if (!items.length) return toast("다운로드할 명단이 없습니다.");
-
-  const rows = [
-    ["번호", "닉네임", "아이디", "상태"],
-    ...items.map((item, index) => [index + 1, item.name, `@${item.id}`, statusLabel(item.status)]),
-  ];
-  const csv = "\ufeff" + rows
-    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
-    .join("\r\n");
-
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "여우방_명단.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function resetAnalysis() {
   $("zipFile").value = "";
   $("fileName").textContent = "인스타그램 ZIP 파일 선택";
@@ -870,8 +966,11 @@ $("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGate
 $("gateRetryBtn").onclick = bootstrapAuth;
 
 $("followSearch").oninput = renderFollowList;
-$("refreshFollowBtn").onclick = () => loadRoomList(true);
-$("reloadRoomBtn").onclick = () => loadRoomList(true);
+$("refreshFollowBtn").onclick = () => loadRoomList(true, true);
+$("reloadRoomBtn").onclick = () => loadRoomList(true, true);
+
+$("followUnlockBtn").onclick = unlockFollow;
+$("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
 
 $("matchUnlockBtn").onclick = unlockMatch;
 $("matchPassword").onkeydown = (event) => { if (event.key === "Enter") unlockMatch(); };
@@ -892,16 +991,19 @@ $("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogi
 $("adminLogoutBtn").onclick = adminLogout;
 $("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
 $("adminRefreshBtn").onclick = async () => {
-  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true, true), loadNotices(false), loadAdminLogs()]);
   toast("전체 새로고침 완료");
 };
 
 $("lockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: true }, "앱을 잠갔습니다.");
 $("unlockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: false }, "앱 잠금을 해제했습니다.");
+$("lockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: true }, "팔로우리스트를 잠갔습니다.");
+$("unlockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: false }, "팔로우리스트 잠금을 해제했습니다.");
 $("lockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: true }, "맞팔확인을 잠갔습니다.");
 $("unlockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: false }, "맞팔확인 잠금을 해제했습니다.");
 
 $("changeAccessPasswordBtn").onclick = () => changePassword("changeAccessPassword", "newAccessPassword", "접속 비밀번호를 변경했습니다.");
+$("changeFollowPasswordBtn").onclick = () => changePassword("changeFollowPassword", "newFollowPassword", "팔로우리스트 비밀번호를 변경했습니다.");
 $("changeMatchPasswordBtn").onclick = () => changePassword("changeMatchPassword", "newMatchPassword", "맞팔확인 비밀번호를 변경했습니다.");
 
 $("saveNoticeBtn").onclick = saveNotice;
@@ -938,7 +1040,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=330").catch(() => {});
   }
 
   setInterval(async () => {
@@ -949,7 +1051,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
-      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
+      await Promise.allSettled([loadNotices(true), loadRoomList(false, false)]);
     }
   }, 60000);
 });
