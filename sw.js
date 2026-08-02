@@ -1,5 +1,23 @@
-const CACHE='yb-v333-lock-preserved-speed';
-const ASSETS=['./','./index.html','./style.css?v=333','./app.js?v=333','./manifest.json?v=333','./config.json?v=333','./favicon-v20.png?v=333','./icon-192-v20.png?v=333','./icon-512-v20.png?v=333','./app-logo-v20.png?v=333','./preview-v26.png?v=333','./room-list.csv'];
-self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));});
-self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));});
-self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const url=new URL(event.request.url);if(url.hostname.includes('script.google.com')||url.hostname.includes('googleusercontent.com')||url.hostname.includes('docs.google.com'))return;event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(response&&response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;})));});
+const CACHE='yb-v334-stable';
+const ASSETS=[
+  './','./index.html','./style.css?v=334','./app.js?v=334',
+  './manifest.json?v=334','./config.json?v=334','./favicon-v20.png?v=334',
+  './icon-192-v20.png?v=334','./icon-512-v20.png?v=334',
+  './app-logo-v20.png?v=334','./preview-v26.png?v=334','./room-list.csv'
+];
+self.addEventListener('install',event=>{
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));
+});
+self.addEventListener('activate',event=>{
+  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+});
+self.addEventListener('fetch',event=>{
+  if(event.request.method!=='GET') return;
+  const url=new URL(event.request.url);
+  if(url.hostname.includes('script.google.com')||url.hostname.includes('googleusercontent.com')||url.hostname.includes('docs.google.com')) return;
+  event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{
+    if(response&&response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}
+    return response;
+  })));
+});

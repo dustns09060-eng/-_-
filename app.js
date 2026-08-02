@@ -15,7 +15,7 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V33";
+const APP_VERSION = "V33.4";
 
 let config = {
   version: "V32 POLISHED UI",
@@ -259,11 +259,22 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  await Promise.allSettled([
-    refreshPublicConfig(false),
-    loadNotices(false),
-  ]);
-  await loadRoomList(false, true);
+  const cached = restoreRoomCache();
+  if (cached) {
+    setSheetState("캐시");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+  }
+
+  await Promise.allSettled([loadNotices(false), refreshPublicConfig(false)]);
+
+  if (cached) {
+    refreshRoomListRemote(false).catch(() => {});
+  } else {
+    await refreshRoomListRemote(false);
+  }
+
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
 }
@@ -432,6 +443,7 @@ function rowsToRoom(rows) {
 }
 
 async function loadRoomList(show = false, force = false) {
+  // 화면 이동 때 이미 받은 명단을 다시 요청하지 않습니다.
   if (!force && roomList.length) {
     setSheetState("정상");
     updateFollowStats();
@@ -439,35 +451,59 @@ async function loadRoomList(show = false, force = false) {
     renderFollowList();
     return;
   }
+
   setSheetState("불러오는 중");
   let lastError = "";
-  try {
-    const data = await apiGet("roomList");
-    roomList = (data.members || []).map((item, index) => ({
-      no: item.no || index + 1,
-      name: item.name || "",
-      id: normalize(item.id),
-    })).filter((item) => validUsername(item.id));
-    if (!roomList.length) throw new Error("API 명단 0명");
-    setSheetState("정상");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-    if (show) toast("명단 새로고침 완료");
-    return;
-  } catch (error) { lastError = error.message; }
-  try {
-    const response = await fetch(config.fallbackCsv || "room-list.csv", { cache: "force-cache" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    roomList = rowsToRoom(parseCsv(await response.text()));
-    if (!roomList.length) throw new Error("백업 명단 0명");
-    setSheetState("백업");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-    if (show) toast("백업 명단으로 불러왔습니다.");
-    return;
-  } catch (error) { lastError = error.message; }
+
+  // 팔로우리스트는 실제 운영 중인 Google Sheet에서 한 번만 직접 불러옵니다.
+  const urls = [
+    `https://docs.google.com/spreadsheets/d/1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg/gviz/tq?tqx=out:csv&gid=1547262511&t=${Date.now()}`,
+    `https://docs.google.com/spreadsheets/d/1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg/export?format=csv&gid=1547262511&t=${Date.now()}`,
+    config.fallbackCsv || "room-list.csv"
+  ];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        cache: url.includes("docs.google.com") ? "no-store" : "force-cache"
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const rows = parseCsv(await response.text());
+      const list = [];
+      const seenRows = new Set();
+
+      rows.forEach((row) => {
+        const noText = String(row[0] || "").trim();
+        const name = String(row[1] || "").trim();
+        const rawId = String(row[2] || "").trim();
+        const id = normalize(rawId);
+
+        // 번호·닉네임·아이디가 모두 있는 실제 회원 행만 사용합니다.
+        if (!/^\d+$/.test(noText)) return;
+        if (!name || !rawId || !validUsername(id)) return;
+        if (/^\d+$/.test(id)) return;
+
+        const key = `${noText}|${name}|${id}`;
+        if (seenRows.has(key)) return;
+        seenRows.add(key);
+        list.push({ no: Number(noText), name, id });
+      });
+
+      if (!list.length) throw new Error("명단 0명");
+
+      roomList = list.sort((a, b) => Number(a.no) - Number(b.no));
+      setSheetState(url.includes("docs.google.com") ? "정상" : "백업");
+      updateFollowStats();
+      renderGroupTabs();
+      renderFollowList();
+      if (show) toast(`명단 ${roomList.length}명 새로고침 완료`);
+      return;
+    } catch (error) {
+      lastError = error.message;
+    }
+  }
+
   setSheetState("오류");
   $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
   if (show) toast("명단 불러오기 실패");
@@ -950,7 +986,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=333").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=334").catch(() => {});
   }
 
   setInterval(async () => {
