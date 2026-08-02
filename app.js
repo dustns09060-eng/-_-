@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
 let roomList = [];
+let matchRoomList = [];
 let result = { all: [], mutual: [], onlyMe: [], fansOnly: [], neither: [] };
 let currentTab = "all";
 let currentGroup = 0;
@@ -15,14 +16,14 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V32";
+const APP_VERSION = "V35";
 
 let config = {
-  version: "V32 POLISHED UI",
+  version: "V35 STABLE",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
-  sheetName: "Sheet1",
+  sheetName: "팔로우리스트",
   fallbackCsv: "room-list.csv",
 };
 
@@ -259,7 +260,11 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  await Promise.allSettled([loadRoomList(false), loadNotices(false), refreshPublicConfig(false)]);
+  await Promise.allSettled([
+    loadRoomList(false),
+    loadNotices(false),
+    refreshPublicConfig(false),
+  ]);
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
 }
@@ -433,7 +438,7 @@ async function loadRoomList(show = false) {
   let lastError = "";
 
   try {
-    const data = await apiGet("roomList");
+    const data = await apiGet("followList");
     roomList = (data.members || []).map((item, index) => ({
       no: item.no || index + 1,
       name: item.name || "",
@@ -481,6 +486,32 @@ async function loadRoomList(show = false) {
   setSheetState("오류");
   $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
   if (show) toast("명단 불러오기 실패");
+}
+
+
+async function loadMatchRoomList(show = false, force = false) {
+  if (!force && matchRoomList.length) return matchRoomList;
+
+  try {
+    const data = await apiGet("matchList");
+    matchRoomList = (data.members || [])
+      .map((item, index) => ({
+        no: item.no || index + 1,
+        name: item.name || "",
+        id: normalize(item.id),
+      }))
+      .filter((item) => validUsername(item.id));
+
+    if (!matchRoomList.length) throw new Error("맞팔확인용 명단 0명");
+    if (show) toast(`맞팔확인용 명단 ${matchRoomList.length}명 새로고침 완료`);
+    return matchRoomList;
+  } catch (error) {
+    // Sheet2가 비어 있거나 연결이 실패하면 기존 팔로우리스트를 안전한 백업으로 사용합니다.
+    if (!roomList.length) await loadRoomList(false);
+    matchRoomList = [...roomList];
+    if (show) toast("맞팔확인용 명단 연결 실패 · 팔로우리스트를 사용합니다.");
+    return matchRoomList;
+  }
 }
 
 function setSheetState(state) {
@@ -612,11 +643,11 @@ async function parseInstagramZip(file) {
   return { followers: unique(followers), following };
 }
 
-function classify(followers, following) {
+function classify(followers, following, baseList = matchRoomList) {
   const followerSet = new Set(followers);
   const followingSet = new Set(following);
 
-  const all = roomList.map((person) => ({
+  const all = baseList.map((person) => ({
     ...person,
     status:
       followerSet.has(person.id) && followingSet.has(person.id) ? "mutual" :
@@ -645,14 +676,14 @@ async function analyze() {
   try {
     button.disabled = true;
     button.textContent = "분석 중...";
-    if (!roomList.length) await loadRoomList();
+    if (!matchRoomList.length) await loadMatchRoomList(false);
     const parsed = await parseInstagramZip($("zipFile").files[0]);
-    classify(parsed.followers, parsed.following);
+    classify(parsed.followers, parsed.following, matchRoomList);
     updateSummary();
     showTab("all");
     $("summarySection").classList.remove("hidden");
     $("resultsSection").classList.remove("hidden");
-    $("status").textContent = `분석 완료 · 단톡방 ${roomList.length}명 기준`;
+    $("status").textContent = `분석 완료 · 맞팔확인용 명단 ${matchRoomList.length}명 기준`;
     toast("분석 완료");
   } catch (error) {
     $("status").textContent = `오류: ${error.message}`;
@@ -725,26 +756,6 @@ async function copyCurrent() {
     items.map((item, index) => `${index + 1}. ${item.name} @${item.id} - ${statusLabel(item.status)}`).join("\n")
   );
   toast("복사 완료");
-}
-
-function downloadCsv() {
-  const items = matchFiltered();
-  if (!items.length) return toast("다운로드할 명단이 없습니다.");
-
-  const rows = [
-    ["번호", "닉네임", "아이디", "상태"],
-    ...items.map((item, index) => [index + 1, item.name, `@${item.id}`, statusLabel(item.status)]),
-  ];
-  const csv = "\ufeff" + rows
-    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
-    .join("\r\n");
-
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "여우방_명단.csv";
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function resetAnalysis() {
@@ -926,7 +937,6 @@ $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
 $("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
-$("csvBtn").onclick = downloadCsv;
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -936,7 +946,7 @@ $("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogi
 $("adminLogoutBtn").onclick = adminLogout;
 $("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
 $("adminRefreshBtn").onclick = async () => {
-  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadMatchRoomList(true, true), loadNotices(false), loadAdminLogs()]);
   toast("전체 새로고침 완료");
 };
 
@@ -985,7 +995,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=350").catch(() => {});
   }
 
   setInterval(async () => {
@@ -996,7 +1006,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
-      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
+      await loadNotices(true).catch(() => {});
     }
-  }, 60000);
+  }, 120000);
 });
