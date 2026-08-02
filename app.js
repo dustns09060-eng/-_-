@@ -926,7 +926,7 @@ $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
 $("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
-$("csvBtn").onclick = downloadCsv;
+
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -985,7 +985,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=323").catch(() => {});
   }
 
   setInterval(async () => {

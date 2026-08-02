@@ -1,16 +1,16 @@
-const CACHE='yb-v322';
+const CACHE='yb-v323-no-csv-button';
 const ASSETS=[
   './',
   './index.html',
-  './style.css?v=322',
-  './app.js?v=322',
-  './manifest.json?v=322',
-  './config.json?v=322',
-  './favicon-v20.png?v=322',
-  './icon-192-v20.png?v=322',
-  './icon-512-v20.png?v=322',
-  './app-logo-v20.png?v=322',
-  './preview-v26.png?v=322',
+  './style.css?v=323',
+  './app.js?v=323',
+  './manifest.json?v=323',
+  './config.json?v=323',
+  './favicon-v20.png?v=323',
+  './icon-192-v20.png?v=323',
+  './icon-512-v20.png?v=323',
+  './app-logo-v20.png?v=323',
+  './preview-v26.png?v=323',
   './room-list.csv'
 ];
 self.addEventListener('install',event=>{
