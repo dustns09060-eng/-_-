@@ -16,10 +16,10 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V35.1";
+const APP_VERSION = "V36";
 
 let config = {
-  version: "V35.1 STABLE",
+  version: "V36 SPRINT 1",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -789,14 +789,64 @@ function renderMatchList() {
     : '<div class="empty-state">결과가 없습니다.</div>';
 }
 
+async function writeClipboardText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error("클립보드 복사에 실패했습니다.");
+  }
+}
+
+function copyTargetItems() {
+  return currentTab === "all"
+    ? [...result.onlyMe, ...result.neither]
+    : matchFiltered();
+}
+
 async function copyCurrent() {
-  const items = currentTab === "all" ? [...result.onlyMe, ...result.neither] : matchFiltered();
+  const items = copyTargetItems();
   if (!items.length) return toast("복사할 명단이 없습니다.");
 
-  await navigator.clipboard.writeText(
-    items.map((item, index) => `${index + 1}. ${item.name} @${item.id} - ${statusLabel(item.status)}`).join("\n")
-  );
-  toast("복사 완료");
+  try {
+    const text = items
+      .map((item, index) => `${index + 1}. ${item.name} @${item.id} - ${statusLabel(item.status)}`)
+      .join("\n");
+
+    await writeClipboardText(text);
+    toast(`${items.length}명 명단 복사 완료`);
+  } catch (error) {
+    toast(error.message || "복사 실패");
+  }
+}
+
+async function copyMentions() {
+  const items = copyTargetItems();
+  if (!items.length) return toast("복사할 멘션이 없습니다.");
+
+  try {
+    const text = items
+      .map((item) => `@${item.id}`)
+      .join("\n");
+
+    await writeClipboardText(text);
+    toast(`${items.length}명 멘션 복사 완료`);
+  } catch (error) {
+    toast(error.message || "멘션 복사 실패");
+  }
 }
 
 function resetAnalysis() {
@@ -978,6 +1028,7 @@ $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
 $("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
+$("mentionBtn").onclick = copyMentions;
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -1036,7 +1087,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=352").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=360").catch(() => {});
   }
 
   setInterval(async () => {
