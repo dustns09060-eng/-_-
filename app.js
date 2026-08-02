@@ -11,11 +11,10 @@ let publicConfig = null;
 let accessGranted = false;
 let appLockGranted = false;
 let matchGranted = false;
-let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V33.5";
+const APP_VERSION = "V32";
 
 let config = {
   version: "V32 POLISHED UI",
@@ -239,7 +238,6 @@ async function submitGatePassword() {
       adminPasswordValue = password;
       accessGranted = true;
       matchGranted = true;
-      followGranted = true;
       setAdminNavigation(true);
       hideGate();
       await loadAfterAuth();
@@ -259,22 +257,7 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  const cached = restoreRoomCache();
-  if (cached) {
-    setSheetState("캐시");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-  }
-
-  await Promise.allSettled([loadNotices(false), refreshPublicConfig(false)]);
-
-  if (cached) {
-    refreshRoomListRemote(false).catch(() => {});
-  } else {
-    await refreshRoomListRemote(false);
-  }
-
+  await Promise.allSettled([loadRoomList(false), loadNotices(false), refreshPublicConfig(false)]);
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
 }
@@ -292,7 +275,6 @@ async function refreshPublicConfig(recheck = true) {
     accessGranted = false;
     appLockGranted = false;
     matchGranted = false;
-    followGranted = false;
     toast("보안 설정이 변경되어 다시 로그인합니다.");
     setAdminNavigation(false);
     await bootstrapAuth();
@@ -311,7 +293,6 @@ function checkVersionUpdate() {
 
 function updateLockIndicators() {
   const appLocked = Boolean(publicConfig?.appLocked);
-  const followLocked = Boolean(publicConfig?.followLocked);
   const matchLocked = Boolean(publicConfig?.matchLocked);
 
   if ($("appLockState")) {
@@ -319,39 +300,9 @@ function updateLockIndicators() {
     $("appLockState").className = `lock-state ${appLocked ? "locked" : "unlocked"}`;
   }
 
-  if ($("followLockState")) {
-    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
-    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
-  }
-
   if ($("matchLockState")) {
     $("matchLockState").textContent = matchLocked ? "잠금 중" : "사용 가능";
     $("matchLockState").className = `lock-state ${matchLocked ? "locked" : "unlocked"}`;
-  }
-}
-
-function applyFollowLock() {
-  const locked = Boolean(publicConfig?.followLocked) && !followGranted && !adminLoggedIn;
-  $("followLockCard").classList.toggle("hidden", !locked);
-  $("followContent").classList.toggle("hidden", locked);
-}
-
-async function unlockFollow() {
-  const password = $("followPassword").value.trim();
-  if (!password) {
-    $("followUnlockMsg").textContent = "비밀번호를 입력해 주세요.";
-    return;
-  }
-
-  try {
-    await apiPost("verifyFollowPassword", { password });
-    followGranted = true;
-    $("followUnlockMsg").textContent = "";
-    $("followPassword").value = "";
-    applyFollowLock();
-    toast("팔로우리스트 잠금이 해제되었습니다.");
-  } catch (_) {
-    $("followUnlockMsg").textContent = "팔로우리스트 비밀번호가 올바르지 않습니다.";
   }
 }
 
@@ -424,66 +375,68 @@ function parseCsv(text) {
 
 function rowsToRoom(rows) {
   const list = [];
+  rows.forEach((row, index) => {
+    const joined = row.join(" ");
+    if (index === 0 && (joined.includes("번호") || joined.includes("닉네임") || joined.includes("아이디"))) return;
 
-  rows.forEach((row) => {
-    const noText = String(row[0] || "").trim();
-    const name = String(row[1] || "").trim();
-    const rawId = String(row[2] || "").trim();
-
-    // 번호가 있고 닉네임 또는 아이디가 있는 실제 회원 행은 모두 유지합니다.
-    if (!/^\d+$/.test(noText)) return;
-    if (!name && !rawId) return;
-
-    list.push({
-      no: Number(noText),
-      name,
-      id: normalize(rawId),
-      rawId,
-    });
+    const id = normalize(row[2] || row[1] || row[0]);
+    if (validUsername(id)) {
+      list.push({
+        no: row[0] || list.length + 1,
+        name: row[1] || "",
+        id,
+      });
+    }
   });
 
-  // 중복 아이디도 각각의 회원 번호로 유지합니다.
-  return list.sort((a, b) => Number(a.no) - Number(b.no));
+  const seen = new Set();
+  return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
 }
 
-async function loadRoomList(show = false, force = false) {
-  // 화면 이동 때 이미 받은 명단을 다시 요청하지 않습니다.
-  if (!force && roomList.length) {
+async function loadRoomList(show = false) {
+  setSheetState("불러오는 중");
+  let lastError = "";
+
+  try {
+    const data = await apiGet("roomList");
+    roomList = (data.members || []).map((item, index) => ({
+      no: item.no || index + 1,
+      name: item.name || "",
+      id: normalize(item.id),
+    })).filter((item) => validUsername(item.id));
+
+    if (!roomList.length) throw new Error("API 명단 0명");
+
     setSheetState("정상");
     updateFollowStats();
     renderGroupTabs();
     renderFollowList();
+    if (show) toast("명단 새로고침 완료");
     return;
+  } catch (error) {
+    lastError = error.message;
   }
 
-  setSheetState("불러오는 중");
-  let lastError = "";
-
-  // 팔로우리스트는 실제 운영 중인 Google Sheet에서 한 번만 직접 불러옵니다.
-  const urls = [
-    `https://docs.google.com/spreadsheets/d/1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg/gviz/tq?tqx=out:csv&gid=1547262511&t=${Date.now()}`,
-    `https://docs.google.com/spreadsheets/d/1NkrQhITYufdimYARxROJiaThJRrok0VNgzFZRnPmxrg/export?format=csv&gid=1547262511&t=${Date.now()}`,
-    config.fallbackCsv || "room-list.csv"
-  ];
+  const urls = [];
+  if (config.sheetId) {
+    const sheet = encodeURIComponent(config.sheetName || "Sheet1");
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
+  }
+  urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
 
   for (const url of urls) {
     try {
-      const response = await fetch(url, {
-        cache: url.includes("docs.google.com") ? "no-store" : "force-cache"
-      });
+      const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const rows = parseCsv(await response.text());
-      const list = rowsToRoom(rows);
-
-      if (!list.length) throw new Error("명단 0명");
-
+      const list = rowsToRoom(parseCsv(await response.text()));
+      if (!list.length) throw new Error("0명");
       roomList = list;
-      setSheetState(url.includes("docs.google.com") ? "정상" : "백업");
+      setSheetState("백업");
       updateFollowStats();
       renderGroupTabs();
       renderFollowList();
-      if (show) toast(`명단 ${roomList.length}명 새로고침 완료`);
+      if (show) toast("백업 명단으로 불러왔습니다.");
       return;
     } catch (error) {
       lastError = error.message;
@@ -497,7 +450,7 @@ async function loadRoomList(show = false, force = false) {
 
 function setSheetState(state) {
   if ($("roomState")) {
-    $("roomState").textContent = state === "정상" || state === "백업" || state === "캐시" ? `${roomList.length}명 준비 완료` : state;
+    $("roomState").textContent = state === "정상" || state === "백업" ? `${roomList.length}명 준비 완료` : state;
   }
   if ($("adminApiState")) $("adminApiState").textContent = state;
 }
@@ -535,7 +488,7 @@ function followFiltered() {
   return query
     ? items.filter((item) =>
         String(item.no).includes(query) ||
-        String(item.id || "").includes(normalize(query)) ||
+        item.id.includes(normalize(query)) ||
         String(item.name).toLowerCase().includes(query))
     : items;
 }
@@ -543,31 +496,19 @@ function followFiltered() {
 function renderFollowList() {
   const items = followFiltered();
   $("followList").innerHTML = items.length
-    ? items.map((item) => {
-      const hasId = validUsername(item.id);
-      const idText = hasId ? `@${escapeHtml(item.id)}` : "아이디 확인 필요";
-      const idCell = hasId
-        ? `<a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">${idText}</a>`
-        : `<span class="follow-id">${idText}</span>`;
-      const openButton = hasId
-        ? `<a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>`
-        : `<span class="insta-btn disabled" aria-disabled="true">확인 필요</span>`;
-
-      return `
+    ? items.map((item) => `
       <div class="follow-item">
         <span class="follow-no">${escapeHtml(item.no)}</span>
-        <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name || "이름 없음")}</span>
-        ${idCell}
-        ${openButton}
-      </div>`;
-    }).join("")
+        <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+        <a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">@${escapeHtml(item.id)}</a>
+        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
+      </div>`).join("")
     : '<div class="empty-state">검색 결과가 없습니다.</div>';
 }
 
 function showView(id) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === id));
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === id));
-  if (id === "followView") applyFollowLock();
   if (id === "matchView") applyMatchLock();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -720,33 +661,23 @@ function matchFiltered() {
   const query = String($("searchInput").value || "").trim().toLowerCase();
   const items = result[currentTab] || [];
   return query
-    ? items.filter((item) => String(item.id || "").includes(normalize(query)) || String(item.name).toLowerCase().includes(query))
+    ? items.filter((item) => item.id.includes(normalize(query)) || String(item.name).toLowerCase().includes(query))
     : items;
 }
 
 function renderMatchList() {
   const items = matchFiltered();
   $("list").innerHTML = items.length
-    ? items.map((item, index) => {
-      const hasId = validUsername(item.id);
-      const idView = hasId
-        ? `<a class="id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>`
-        : `<span class="id">아이디 확인 필요</span>`;
-      const openView = hasId
-        ? `<a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>`
-        : `<span class="insta disabled" aria-disabled="true">확인 필요</span>`;
-
-      return `
+    ? items.map((item, index) => `
       <div class="item">
         <span class="item-no">${index + 1}</span>
         <div class="item-person">
-          <strong class="item-name">${escapeHtml(item.name || "이름 없음")}</strong>
-          ${idView}
+          <strong class="item-name">${escapeHtml(item.name)}</strong>
+          <a class="id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>
         </div>
         <span class="badge ${item.status}">${statusLabel(item.status)}</span>
-        ${openView}
-      </div>`;
-    }).join("")
+        <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
+      </div>`).join("")
     : '<div class="empty-state">결과가 없습니다.</div>';
 }
 
@@ -758,6 +689,26 @@ async function copyCurrent() {
     items.map((item, index) => `${index + 1}. ${item.name} @${item.id} - ${statusLabel(item.status)}`).join("\n")
   );
   toast("복사 완료");
+}
+
+function downloadCsv() {
+  const items = matchFiltered();
+  if (!items.length) return toast("다운로드할 명단이 없습니다.");
+
+  const rows = [
+    ["번호", "닉네임", "아이디", "상태"],
+    ...items.map((item, index) => [index + 1, item.name, `@${item.id}`, statusLabel(item.status)]),
+  ];
+  const csv = "\ufeff" + rows
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "여우방_명단.csv";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function resetAnalysis() {
@@ -919,11 +870,8 @@ $("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGate
 $("gateRetryBtn").onclick = bootstrapAuth;
 
 $("followSearch").oninput = renderFollowList;
-$("refreshFollowBtn").onclick = () => loadRoomList(true, true);
-$("reloadRoomBtn").onclick = () => loadRoomList(true, true);
-
-$("followUnlockBtn").onclick = unlockFollow;
-$("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
+$("refreshFollowBtn").onclick = () => loadRoomList(true);
+$("reloadRoomBtn").onclick = () => loadRoomList(true);
 
 $("matchUnlockBtn").onclick = unlockMatch;
 $("matchPassword").onkeydown = (event) => { if (event.key === "Enter") unlockMatch(); };
@@ -935,6 +883,7 @@ $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
 $("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
+$("csvBtn").onclick = downloadCsv;
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -944,19 +893,16 @@ $("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogi
 $("adminLogoutBtn").onclick = adminLogout;
 $("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
 $("adminRefreshBtn").onclick = async () => {
-  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true, true), loadNotices(false), loadAdminLogs()]);
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
   toast("전체 새로고침 완료");
 };
 
 $("lockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: true }, "앱을 잠갔습니다.");
 $("unlockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: false }, "앱 잠금을 해제했습니다.");
-$("lockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: true }, "팔로우리스트를 잠갔습니다.");
-$("unlockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: false }, "팔로우리스트 잠금을 해제했습니다.");
 $("lockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: true }, "맞팔확인을 잠갔습니다.");
 $("unlockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: false }, "맞팔확인 잠금을 해제했습니다.");
 
 $("changeAccessPasswordBtn").onclick = () => changePassword("changeAccessPassword", "newAccessPassword", "접속 비밀번호를 변경했습니다.");
-$("changeFollowPasswordBtn").onclick = () => changePassword("changeFollowPassword", "newFollowPassword", "팔로우리스트 비밀번호를 변경했습니다.");
 $("changeMatchPasswordBtn").onclick = () => changePassword("changeMatchPassword", "newMatchPassword", "맞팔확인 비밀번호를 변경했습니다.");
 
 $("saveNoticeBtn").onclick = saveNotice;
@@ -993,7 +939,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=335").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
   }
 
   setInterval(async () => {
@@ -1004,7 +950,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
-      await loadNotices(true).catch(() => {});
+      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
     }
-  }, 120000);
+  }, 60000);
 });
