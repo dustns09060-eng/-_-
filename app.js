@@ -15,10 +15,7 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V33";
-const ROOM_CACHE_KEY = "yb_room_list_v33";
-const ROOM_CACHE_TIME_KEY = "yb_room_list_time_v33";
-const ROOM_CACHE_MAX_AGE = 10 * 60 * 1000;
+const APP_VERSION = "V32";
 
 let config = {
   version: "V32 POLISHED UI",
@@ -262,22 +259,7 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  const cached = restoreRoomCache();
-  if (cached) {
-    setSheetState("캐시");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-  }
-
-  await Promise.allSettled([loadNotices(false), refreshPublicConfig(false)]);
-
-  if (cached) {
-    refreshRoomListRemote(false).catch(() => {});
-  } else {
-    await refreshRoomListRemote(false);
-  }
-
+  await Promise.allSettled([loadRoomList(false), loadNotices(false), refreshPublicConfig(false)]);
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
 }
@@ -286,6 +268,7 @@ async function refreshPublicConfig(recheck = true) {
   const previousSecurity = securityVersion || publicConfig?.securityVersion || "";
   publicConfig = await apiGet("publicConfig");
   updateLockIndicators();
+  applyFollowLock();
   applyMatchLock();
   checkVersionUpdate();
 
@@ -314,29 +297,29 @@ function checkVersionUpdate() {
 
 function updateLockIndicators() {
   const appLocked = Boolean(publicConfig?.appLocked);
-  const followLocked = Boolean(publicConfig?.followLocked);
   const matchLocked = Boolean(publicConfig?.matchLocked);
+  const followLocked = Boolean(publicConfig?.followLocked);
 
   if ($("appLockState")) {
     $("appLockState").textContent = appLocked ? "잠금 중" : "사용 가능";
     $("appLockState").className = `lock-state ${appLocked ? "locked" : "unlocked"}`;
   }
 
-  if ($("followLockState")) {
-    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
-    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
-  }
-
   if ($("matchLockState")) {
     $("matchLockState").textContent = matchLocked ? "잠금 중" : "사용 가능";
     $("matchLockState").className = `lock-state ${matchLocked ? "locked" : "unlocked"}`;
+  }
+
+  if ($("followLockState")) {
+    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
+    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
   }
 }
 
 function applyFollowLock() {
   const locked = Boolean(publicConfig?.followLocked) && !followGranted && !adminLoggedIn;
-  $("followLockCard").classList.toggle("hidden", !locked);
-  $("followContent").classList.toggle("hidden", locked);
+  $("followLockCard")?.classList.toggle("hidden", !locked);
+  $("followContent")?.classList.toggle("hidden", locked);
 }
 
 async function unlockFollow() {
@@ -445,60 +428,26 @@ function rowsToRoom(rows) {
   return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
 }
 
-function restoreRoomCache() {
-  try {
-    const raw = localStorage.getItem(ROOM_CACHE_KEY);
-    if (!raw) return false;
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list) || !list.length) return false;
-    roomList = list.filter(item => item && validUsername(normalize(item.id))).map((item, index) => ({
-      no: item.no || index + 1,
-      name: item.name || "",
-      id: normalize(item.id),
-    }));
-    return roomList.length > 0;
-  } catch (_) {
-    return false;
-  }
-}
-
-function saveRoomCache() {
-  try {
-    localStorage.setItem(ROOM_CACHE_KEY, JSON.stringify(roomList));
-    localStorage.setItem(ROOM_CACHE_TIME_KEY, String(Date.now()));
-  } catch (_) {}
-}
-
-function roomCacheIsFresh() {
-  const time = Number(localStorage.getItem(ROOM_CACHE_TIME_KEY) || 0);
-  return Boolean(time && Date.now() - time < ROOM_CACHE_MAX_AGE);
-}
-
-async function refreshRoomListRemote(show = false) {
+async function loadRoomList(show = false) {
   setSheetState("불러오는 중");
   let lastError = "";
 
   try {
     const data = await apiGet("roomList");
-    const nextList = (data.members || []).map((item, index) => ({
+    roomList = (data.members || []).map((item, index) => ({
       no: item.no || index + 1,
       name: item.name || "",
       id: normalize(item.id),
     })).filter((item) => validUsername(item.id));
 
-    if (!nextList.length) throw new Error("API 명단 0명");
+    if (!roomList.length) throw new Error("API 명단 0명");
 
-    const changed = JSON.stringify(nextList) !== JSON.stringify(roomList);
-    roomList = nextList;
-    saveRoomCache();
     setSheetState("정상");
-    if (changed || !$("followList").children.length) {
-      updateFollowStats();
-      renderGroupTabs();
-      renderFollowList();
-    }
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
     if (show) toast("명단 새로고침 완료");
-    return true;
+    return;
   } catch (error) {
     lastError = error.message;
   }
@@ -517,55 +466,26 @@ async function refreshRoomListRemote(show = false) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const list = rowsToRoom(parseCsv(await response.text()));
       if (!list.length) throw new Error("0명");
-      const changed = JSON.stringify(list) !== JSON.stringify(roomList);
       roomList = list;
-      saveRoomCache();
       setSheetState("백업");
-      if (changed || !$("followList").children.length) {
-        updateFollowStats();
-        renderGroupTabs();
-        renderFollowList();
-      }
+      updateFollowStats();
+      renderGroupTabs();
+      renderFollowList();
       if (show) toast("백업 명단으로 불러왔습니다.");
-      return true;
+      return;
     } catch (error) {
       lastError = error.message;
     }
   }
 
-  if (roomList.length) {
-    setSheetState("캐시");
-    if (show) toast("저장된 명단을 표시합니다.");
-    return false;
-  }
-
   setSheetState("오류");
   $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
   if (show) toast("명단 불러오기 실패");
-  return false;
-}
-
-async function loadRoomList(show = false, force = false) {
-  const restored = roomList.length > 0 || restoreRoomCache();
-  if (restored) {
-    setSheetState("캐시");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-  }
-
-  if (!force && restored && roomCacheIsFresh()) {
-    refreshRoomListRemote(false).catch(() => {});
-    if (show) toast("저장된 명단을 빠르게 불러왔습니다.");
-    return;
-  }
-
-  await refreshRoomListRemote(show);
 }
 
 function setSheetState(state) {
   if ($("roomState")) {
-    $("roomState").textContent = state === "정상" || state === "백업" || state === "캐시" ? `${roomList.length}명 준비 완료` : state;
+    $("roomState").textContent = state === "정상" || state === "백업" ? `${roomList.length}명 준비 완료` : state;
   }
   if ($("adminApiState")) $("adminApiState").textContent = state;
 }
@@ -807,6 +727,26 @@ async function copyCurrent() {
   toast("복사 완료");
 }
 
+function downloadCsv() {
+  const items = matchFiltered();
+  if (!items.length) return toast("다운로드할 명단이 없습니다.");
+
+  const rows = [
+    ["번호", "닉네임", "아이디", "상태"],
+    ...items.map((item, index) => [index + 1, item.name, `@${item.id}`, statusLabel(item.status)]),
+  ];
+  const csv = "\ufeff" + rows
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "여우방_명단.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function resetAnalysis() {
   $("zipFile").value = "";
   $("fileName").textContent = "인스타그램 ZIP 파일 선택";
@@ -887,6 +827,8 @@ async function adminLogin() {
     showAdminPanel();
     loadAdminLogs();
     matchGranted = true;
+    followGranted = true;
+    applyFollowLock();
     applyMatchLock();
     toast("운영진 로그인 완료");
   } catch (_) {
@@ -905,10 +847,12 @@ function adminLogout() {
   adminPasswordValue = "";
   accessGranted = false;
   matchGranted = false;
+  followGranted = false;
   $("adminPanel").classList.add("hidden");
   $("adminLoginCard").classList.remove("hidden");
   $("adminPassword").value = "";
   setAdminNavigation(false);
+  applyFollowLock();
   applyMatchLock();
   bootstrapAuth();
 }
@@ -966,8 +910,8 @@ $("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGate
 $("gateRetryBtn").onclick = bootstrapAuth;
 
 $("followSearch").oninput = renderFollowList;
-$("refreshFollowBtn").onclick = () => loadRoomList(true, true);
-$("reloadRoomBtn").onclick = () => loadRoomList(true, true);
+$("refreshFollowBtn").onclick = () => loadRoomList(true);
+$("reloadRoomBtn").onclick = () => loadRoomList(true);
 
 $("followUnlockBtn").onclick = unlockFollow;
 $("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
@@ -982,6 +926,7 @@ $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
 $("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
+$("csvBtn").onclick = downloadCsv;
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -991,7 +936,7 @@ $("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogi
 $("adminLogoutBtn").onclick = adminLogout;
 $("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
 $("adminRefreshBtn").onclick = async () => {
-  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true, true), loadNotices(false), loadAdminLogs()]);
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
   toast("전체 새로고침 완료");
 };
 
@@ -1040,7 +985,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=334").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
   }
 
   setInterval(async () => {
@@ -1051,7 +996,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
-      await loadNotices(true).catch(() => {});
+      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
     }
-  }, 120000);
+  }, 60000);
 });
