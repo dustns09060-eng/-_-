@@ -15,48 +15,16 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V37";
+const APP_VERSION = "V32";
 
 let config = {
-  version: "V37 STABLE API ONLY",
+  version: "V32 POLISHED UI",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
   sheetName: "Sheet1",
+  fallbackCsv: "room-list.csv",
 };
-
-const ROOM_CACHE_KEY = "ybRoomListV37";
-const ROOM_CACHE_TIME_KEY = "ybRoomListTimeV37";
-
-function normalizeRoomMembers(items) {
-  return (items || []).map((item, index) => ({
-    no: item.no || index + 1,
-    name: String(item.name || "").trim(),
-    id: normalize(item.id),
-  })).filter((item) => item.name && validUsername(item.id));
-}
-
-function restoreRoomCache() {
-  try {
-    const cached = JSON.parse(localStorage.getItem(ROOM_CACHE_KEY) || "[]");
-    if (!Array.isArray(cached) || !cached.length) return false;
-    roomList = normalizeRoomMembers(cached);
-    setSheetState("저장됨");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function saveRoomCache() {
-  try {
-    localStorage.setItem(ROOM_CACHE_KEY, JSON.stringify(roomList));
-    localStorage.setItem(ROOM_CACHE_TIME_KEY, String(Date.now()));
-  } catch (_) {}
-}
 
 function toast(message) {
   const el = $("toast");
@@ -291,11 +259,9 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  restoreRoomCache();
-  await Promise.allSettled([loadNotices(false), refreshPublicConfig(false)]);
+  await Promise.allSettled([loadRoomList(false), loadNotices(false), refreshPublicConfig(false)]);
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
-  loadRoomList(false).catch(() => {});
 }
 
 async function refreshPublicConfig(recheck = true) {
@@ -331,22 +297,22 @@ function checkVersionUpdate() {
 
 function updateLockIndicators() {
   const appLocked = Boolean(publicConfig?.appLocked);
-  const followLocked = Boolean(publicConfig?.followLocked);
   const matchLocked = Boolean(publicConfig?.matchLocked);
+  const followLocked = Boolean(publicConfig?.followLocked);
 
   if ($("appLockState")) {
     $("appLockState").textContent = appLocked ? "잠금 중" : "사용 가능";
     $("appLockState").className = `lock-state ${appLocked ? "locked" : "unlocked"}`;
   }
 
-  if ($("followLockState")) {
-    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
-    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
-  }
-
   if ($("matchLockState")) {
     $("matchLockState").textContent = matchLocked ? "잠금 중" : "사용 가능";
     $("matchLockState").className = `lock-state ${matchLocked ? "locked" : "unlocked"}`;
+  }
+
+  if ($("followLockState")) {
+    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
+    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
   }
 }
 
@@ -362,6 +328,7 @@ async function unlockFollow() {
     $("followUnlockMsg").textContent = "비밀번호를 입력해 주세요.";
     return;
   }
+
   try {
     await apiPost("verifyFollowPassword", { password });
     followGranted = true;
@@ -403,35 +370,122 @@ function sheetUrl() {
   return `https://docs.google.com/spreadsheets/d/${config.sheetId}/edit`;
 }
 
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      i++;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (cell || row.length) {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = "";
+      }
+      if (char === "\r" && next === "\n") i++;
+    } else {
+      cell += char;
+    }
+  }
+
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function rowsToRoom(rows) {
+  const list = [];
+  rows.forEach((row, index) => {
+    const joined = row.join(" ");
+    if (index === 0 && (joined.includes("번호") || joined.includes("닉네임") || joined.includes("아이디"))) return;
+
+    const id = normalize(row[2] || row[1] || row[0]);
+    if (validUsername(id)) {
+      list.push({
+        no: row[0] || list.length + 1,
+        name: row[1] || "",
+        id,
+      });
+    }
+  });
+
+  const seen = new Set();
+  return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
+}
+
 async function loadRoomList(show = false) {
-  if (!roomList.length) setSheetState("불러오는 중");
+  setSheetState("불러오는 중");
+  let lastError = "";
+
   try {
     const data = await apiGet("roomList");
-    const nextList = normalizeRoomMembers(data.members || []);
-    if (!nextList.length) throw new Error("API 명단 0명");
+    roomList = (data.members || []).map((item, index) => ({
+      no: item.no || index + 1,
+      name: item.name || "",
+      id: normalize(item.id),
+    })).filter((item) => validUsername(item.id));
 
-    roomList = nextList;
-    saveRoomCache();
+    if (!roomList.length) throw new Error("API 명단 0명");
+
     setSheetState("정상");
     updateFollowStats();
     renderGroupTabs();
     renderFollowList();
     if (show) toast("명단 새로고침 완료");
+    return;
   } catch (error) {
-    if (roomList.length) {
-      setSheetState("저장됨");
-      if (show) toast("서버 연결 실패 · 저장된 명단을 사용합니다.");
-      return;
-    }
-    setSheetState("오류");
-    $("followState").textContent = `명단을 불러오지 못했습니다. (${error.message})`;
-    if (show) toast("명단 불러오기 실패");
+    lastError = error.message;
   }
+
+  const urls = [];
+  if (config.sheetId) {
+    const sheet = encodeURIComponent(config.sheetName || "Sheet1");
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
+  }
+  urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const list = rowsToRoom(parseCsv(await response.text()));
+      if (!list.length) throw new Error("0명");
+      roomList = list;
+      setSheetState("백업");
+      updateFollowStats();
+      renderGroupTabs();
+      renderFollowList();
+      if (show) toast("백업 명단으로 불러왔습니다.");
+      return;
+    } catch (error) {
+      lastError = error.message;
+    }
+  }
+
+  setSheetState("오류");
+  $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
+  if (show) toast("명단 불러오기 실패");
 }
 
 function setSheetState(state) {
   if ($("roomState")) {
-    $("roomState").textContent = ["정상", "저장됨"].includes(state) ? `${roomList.length}명 준비 완료` : state;
+    $("roomState").textContent = state === "정상" || state === "백업" ? `${roomList.length}명 준비 완료` : state;
   }
   if ($("adminApiState")) $("adminApiState").textContent = state;
 }
@@ -673,6 +727,26 @@ async function copyCurrent() {
   toast("복사 완료");
 }
 
+function downloadCsv() {
+  const items = matchFiltered();
+  if (!items.length) return toast("다운로드할 명단이 없습니다.");
+
+  const rows = [
+    ["번호", "닉네임", "아이디", "상태"],
+    ...items.map((item, index) => [index + 1, item.name, `@${item.id}`, statusLabel(item.status)]),
+  ];
+  const csv = "\ufeff" + rows
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "여우방_명단.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function resetAnalysis() {
   $("zipFile").value = "";
   $("fileName").textContent = "인스타그램 ZIP 파일 선택";
@@ -836,10 +910,11 @@ $("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGate
 $("gateRetryBtn").onclick = bootstrapAuth;
 
 $("followSearch").oninput = renderFollowList;
-$("followUnlockBtn").onclick = unlockFollow;
-$("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
 $("refreshFollowBtn").onclick = () => loadRoomList(true);
 $("reloadRoomBtn").onclick = () => loadRoomList(true);
+
+$("followUnlockBtn").onclick = unlockFollow;
+$("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
 
 $("matchUnlockBtn").onclick = unlockMatch;
 $("matchPassword").onkeydown = (event) => { if (event.key === "Enter") unlockMatch(); };
@@ -851,6 +926,7 @@ $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
 $("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
+$("csvBtn").onclick = downloadCsv;
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -909,7 +985,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=370").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
   }
 
   setInterval(async () => {
@@ -920,13 +996,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
-      await loadNotices(true);
+      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
     }
   }, 60000);
-
-  setInterval(async () => {
-    if (!document.hidden && accessGranted) {
-      await loadRoomList(false);
-    }
-  }, 10 * 60 * 1000);
 });
