@@ -1,322 +1,459 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#ffffff" />
-  <meta name="application-name" content="여우방 팔로우리스트+맞팔확인" />
-  <meta name="apple-mobile-web-app-title" content="여우방 팔로우리스트+맞팔확인" />
-  <meta name="description" content="" />
-  <title>여우방 팔로우리스트+맞팔확인</title>
-  <link rel="canonical" href="https://dustns09060-eng.github.io/-_-/?v=322" />
-  <link rel="manifest" href="manifest.json?v=322" />
-  <link rel="icon" href="favicon-v20.png?v=322" type="image/png" />
-  <link rel="apple-touch-icon" href="icon-192-v20.png?v=322" />
-  <link rel="stylesheet" href="style.css?v=322" />
-
-  <meta property="og:locale" content="ko_KR" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="여우방 팔로우리스트+맞팔확인" />
-  <meta property="og:title" content="여우방 팔로우리스트+맞팔확인" />
-  <meta property="og:description" content="" />
-  <meta property="og:url" content="https://dustns09060-eng.github.io/-_-/?v=322" />
-  <meta property="og:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=322" />
-  <meta property="og:image:secure_url" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=322" />
-  <meta property="og:image:type" content="image/png" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="여우방 팔로우리스트+맞팔확인" />
-  <meta name="twitter:description" content="" />
-  <meta name="twitter:image" content="https://dustns09060-eng.github.io/-_-/preview-v26.png?v=322" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ff4f87">
+<title>여우방 팔로우리스트</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:12px 12px 78px;font-family:Arial,"Malgun Gothic",sans-serif;background:#fff7fa;color:#222}
+header{padding:8px 2px 14px}
+h1{margin:0;color:#d93673;font-size:24px}
+.sub{font-size:12px;color:#777;line-height:1.5}
+.card{background:#fff;border:1px solid #ffd4e2;border-radius:18px;padding:13px;margin-bottom:11px;box-shadow:0 5px 14px rgba(255,79,135,.08)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.tabs button{background:#fff;color:#555;border:1px solid #bbb}
+.tabs button.active{background:#222;color:#fff;border-color:#222}
+button,a.btn{border:0;border-radius:12px;padding:11px;background:#ff4f87;color:#fff;font-weight:bold;text-align:center;text-decoration:none}
+.full{display:block;width:100%}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+input[type=text],input[type=password],input[type=file],textarea{width:100%;padding:11px;border:1px solid #bbb;border-radius:12px;margin:5px 0 8px;background:#fff}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.stat{text-align:center;border:1px solid #ffd4e2;border-radius:13px;padding:8px 3px}
+.stat b{display:block;color:#d93673;font-size:19px}
+.stat span{font-size:11px}
+.pageBtns,.filterBtns{display:flex;gap:6px;overflow-x:auto;padding:8px 0}
+.pageBtns button,.filterBtns button{white-space:nowrap;background:#fff;color:#444;border:1px solid #aaa;padding:8px 10px}
+.pageBtns button.active,.filterBtns button.active{background:#222;color:#fff}
+.person{display:grid;grid-template-columns:minmax(115px,1fr) auto auto;gap:7px;align-items:center;min-height:42px;padding:7px 2px;border-bottom:1px solid #e7e7e7;font-size:13px}
+.person .main{min-width:0}
+.person .name{font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person .id{font-size:12px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.instaBtn{text-decoration:none;color:#fff;background:#d93673;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:bold;white-space:nowrap}
+.status{font-size:11px;border-radius:999px;padding:5px 7px;white-space:nowrap}
+.green{background:#dcf6e5;color:#176e37}.red{background:#ffe1e4;color:#ac2637}.yellow{background:#fff0bd;color:#7c5a00}.gray{background:#eee;color:#555}
+.hidden{display:none!important}
+.notice{display:none;background:#fff0f5;border:1px solid #ffc5d8;border-radius:12px;padding:10px;white-space:pre-line;font-size:13px;margin-top:9px}
+.modalBg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center;padding:14px}
+.modal{background:#fff;border-radius:22px;padding:16px;width:100%;max-width:430px;max-height:88vh;overflow:auto}
+.light{background:#fff!important;color:#d93673!important;border:1px solid #ff95bb!important}
+.dark{background:#222!important}
+.bottom{position:fixed;left:0;right:0;bottom:0;display:flex;background:#fff;box-shadow:0 -4px 12px rgba(0,0,0,.08)}
+.bottom button{flex:1;border-radius:0;background:#fff;color:#d93673;font-size:12px;padding:8px 3px}
+.sectionTitle{font-size:18px;font-weight:bold;margin:2px 0 9px}
+.empty{text-align:center;color:#777;padding:24px}
+.help{background:#f7f7f7;border-radius:12px;padding:9px;font-size:12px;color:#666;line-height:1.5}
+.downloads{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.downloads button{padding:9px 6px;font-size:12px}
+</style>
 </head>
 <body>
-  <div id="appGate" class="gate-overlay">
-    <section class="gate-card access-card">
-      <img src="app-logo-v20.png?v=322" alt="여우방 로고" class="gate-logo" />
-      <h1 id="gateTitle">여우방</h1>
-      <p id="gateMessage" class="hidden"></p>
+<header>
+  <div class="sub">🦊 YEO WOO BANG</div>
+  <h1>팔로우리스트 · 맞팔확인</h1>
+  <div id="noticeBox" class="notice"></div>
+</header>
 
-      <div id="gateRoleSelect" class="access-role-grid">
-        <button id="generalAccessBtn" class="access-role general" type="button">
-          <span class="role-icon">🦊</span>
-          <strong>이용하기</strong>
-        </button>
-        <button id="adminAccessBtn" class="access-role admin" type="button">
-          <span class="role-icon">⚙️</span>
-          <strong>운영진</strong>
-        </button>
-      </div>
-
-      <div id="gateForm" class="gate-form hidden">
-        <input id="gatePassword" type="password" inputmode="numeric" autocomplete="current-password" placeholder="비밀번호 입력" />
-        <button id="gateSubmitBtn" class="primary" type="button">입장하기</button>
-        <button id="gateBackBtn" class="text-btn" type="button">뒤로</button>
-      </div>
-
-      <button id="gateRetryBtn" class="outline hidden" type="button">다시 시도</button>
-      <p id="gateError" class="error-text"></p>
-    </section>
+<div class="card">
+  <div class="tabs">
+    <button id="tabList" class="active" onclick="showPage('list')">팔로우리스트</button>
+    <button id="tabCheck" onclick="showPage('check')">맞팔확인</button>
+    <button onclick="openAdmin()">운영진</button>
   </div>
+</div>
 
-  <div id="updateOverlay" class="gate-overlay hidden">
-    <section class="gate-card">
-      <img src="app-logo-v20.png?v=322" alt="여우방 로고" class="gate-logo" />
-      <h1>새 버전이 있습니다</h1>
-      <p id="updateMessage">앱을 최신 버전으로 업데이트해 주세요.</p>
-      <button id="updateNowBtn" class="primary" type="button">지금 업데이트</button>
-    </section>
+<section id="listPage">
+  <div class="card">
+    <div class="sectionTitle">팔로우리스트</div>
+    <input id="listSearch" type="text" placeholder="번호, 닉네임, 아이디 검색" oninput="renderRoomList()">
+    <button class="full" onclick="loadRoomList()">새로고침</button>
+    <div id="pageButtons" class="pageBtns"></div>
+    <div id="listCount" class="sub">불러오는 중...</div>
   </div>
+  <div id="roomList"></div>
+</section>
 
-  <header class="header">
-    <div class="brand">
-      <img class="brand-logo" src="app-logo-v20.png?v=322" alt="여우방 로고" />
-      <div class="brand-text"><h1>여우방</h1><p class="hidden">팔로우리스트+맞팔확인</p></div>
+<section id="checkPage" class="hidden">
+  <div class="card">
+    <div class="sectionTitle">인스타 ZIP 파일 첨부</div>
+    <input id="instagramZip" type="file" accept=".zip,application/zip">
+    <button class="full" onclick="analyzeZip()">ZIP 분석 시작</button>
+    <div id="zipProgress" class="sub" style="margin-top:8px"></div>
+    <div class="help" style="margin-top:9px">
+      인스타그램에서 다운로드한 정보 ZIP 파일을 압축 해제하지 않고 그대로 선택하세요.
+      HTML과 JSON 형식을 자동으로 찾아 비교합니다.
     </div>
-    <button id="installBtn" class="install" type="button">앱설치</button>
-  </header>
+  </div>
 
-  <main class="container">
-    <section id="noticeCard" class="notice-card hidden">
-      <div class="notice-head">
-        <strong>📢 공지</strong>
-        <button id="closeNoticeBtn" type="button">닫기</button>
+  <div id="checkResults" class="hidden">
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><b id="mutualCount">0</b><span>맞팔</span></div>
+        <div class="stat"><b id="onlyMeCount">0</b><span>나만 팔로우</span></div>
+        <div class="stat"><b id="onlyThemCount">0</b><span>상대만 팔로우</span></div>
       </div>
-      <div id="noticeList"></div>
-    </section>
-
-    <section id="followView" class="view active">
-      <section id="followLockCard" class="card lock-card hidden">
-        <div class="lock-icon">🔒</div>
-        <h2>팔로우리스트 잠금 중</h2>
-        <p>팔로우리스트 비밀번호를 입력해 주세요.</p>
-        <div class="inline-auth">
-          <input id="followPassword" type="password" inputmode="numeric" placeholder="팔로우리스트 비밀번호" />
-          <button id="followUnlockBtn" class="primary small-primary" type="button">잠금 해제</button>
-        </div>
-        <p id="followUnlockMsg" class="error-text"></p>
-      </section>
-
-      <div id="followContent">
-      <section class="card">
-        <div class="section-title-row">
-          <div>
-            <h2>팔로우리스트</h2>
-          </div>
-          <button id="refreshFollowBtn" class="icon-btn" type="button" aria-label="명단 새로고침" title="명단 새로고침">↻</button>
-        </div>
-
-        <div class="simple-stats">
-          <article><span>👥</span><strong id="followTotal">0명</strong></article>
-          <article><span>▦</span><strong id="groupTotal">0조</strong></article>
-        </div>
-        <span id="lastRefresh" class="hidden">대기</span>
-
-        <div class="follow-tools-sticky">
-          <div class="search-wrap standalone">
-            <span>⌕</span>
-            <input id="followSearch" type="search" placeholder="번호 · 닉네임 · 아이디 검색" />
-          </div>
-          <div id="groupTabs" class="group-tabs"></div>
-        </div>
-        <p id="followState" class="state-text">접속 비밀번호 확인 후 명단을 불러옵니다.</p>
-        <div class="follow-head"><span>번호</span><span>닉네임</span><span>아이디</span><span>바로가기</span></div>
-        <div id="followList" class="follow-list"></div>
-      </section>
+      <div class="filterBtns">
+        <button class="active" onclick="setCheckFilter('all',this)">전체</button>
+        <button onclick="setCheckFilter('mutual',this)">맞팔</button>
+        <button onclick="setCheckFilter('onlyMe',this)">나만</button>
+        <button onclick="setCheckFilter('onlyThem',this)">상대만</button>
       </div>
-    </section>
+      <input id="checkSearch" type="text" placeholder="번호, 닉네임, 아이디 검색" oninput="renderCheck()">
+      <div id="checkList"></div>
+    </div>
+  </div>
+</section>
 
-    <section id="matchView" class="view">
-      <section id="matchLockCard" class="card lock-card hidden">
-        <div class="lock-icon">🔒</div>
-        <h2>맞팔확인 잠금 중</h2>
-        <p>맞팔확인 비밀번호를 입력해 주세요.</p>
-        <div class="inline-auth">
-          <input id="matchPassword" type="password" inputmode="numeric" placeholder="맞팔확인 비밀번호" />
-          <button id="matchUnlockBtn" class="primary small-primary" type="button">잠금 해제</button>
-        </div>
-        <p id="matchUnlockMsg" class="error-text"></p>
-      </section>
+<div id="adminModal" class="modalBg">
+  <div class="modal">
+    <div class="sectionTitle">운영진 전용</div>
+    <input id="adminPw" type="password" placeholder="비밀번호 입력">
+    <div class="row">
+      <button onclick="adminLogin()">로그인</button>
+      <button class="light" onclick="closeAdmin()">닫기</button>
+    </div>
 
-      <div id="matchContent">
-        <section class="card start-card">
-          <div class="room-row">
-            <div class="room-info"><span>단톡방 명단</span><strong id="roomState">대기</strong></div>
-            <button id="reloadRoomBtn" class="icon-btn" type="button" aria-label="명단 새로고침" title="명단 새로고침">↻</button>
-          </div>
-          <label class="file-input" for="zipFile">
-            <span id="fileName">인스타그램 ZIP 파일 선택</span>
-            <input id="zipFile" type="file" accept=".zip,application/zip" />
-          </label>
-          <button id="analyzeBtn" class="primary" type="button">맞팔 분석 시작 <span>→</span></button>
-          <p id="status" class="status">단톡방 명단을 불러온 뒤 ZIP 파일을 선택해 주세요.</p>
-        </section>
+    <div id="adminPanel" class="hidden">
+      <div class="sectionTitle" style="margin-top:17px">명단 관리</div>
+      <a class="btn full dark" target="_blank" href="https://docs.google.com/spreadsheets/d/1m14GywxIymZp6p9izJ6QVWaC8fCnjr5F5OdXCKKUcss/edit">구글시트 열기</a>
+      <button class="full" onclick="loadRoomList()">명단 새로고침</button>
 
-        <section id="summarySection" class="card hidden">
-          <div class="section-title-row"><h2>분석 결과 요약</h2><button id="resetBtn" class="icon-btn" type="button" aria-label="새로 분석" title="새로 분석">↻</button></div>
-          <div class="summary-grid">
-            <article class="summary-box green"><span>맞팔 완료</span><strong id="mutualCount">0명</strong><small id="mutualRate">0%</small></article>
-            <article class="summary-box orange"><span>나만 팔로우 함</span><strong id="onlyMeCount">0명</strong><small id="onlyMeRate">0%</small></article>
-            <article class="summary-box blue"><span>상대가 팔로우만 함</span><strong id="fansOnlyCount">0명</strong><small id="fansOnlyRate">0%</small></article>
-            <article class="summary-box gray"><span>서로 팔로우 안 함</span><strong id="neitherCount">0명</strong><small id="neitherRate">0%</small></article>
-          </div>
-          <p id="rateText" class="rate"></p>
-        </section>
-
-        <section id="resultsSection" class="card hidden">
-          <div class="tools">
-            <div class="search-wrap"><span>⌕</span><input id="searchInput" type="search" placeholder="아이디 또는 닉네임 검색" /></div>
-            <button id="copyBtn" class="outline" type="button">미맞팔 복사</button>
-            <button id="csvBtn" class="outline" type="button">CSV</button>
-          </div>
-          <div class="tabs">
-            <button class="tab active" data-tab="all">전체 (<span id="tabAll">0</span>)</button>
-            <button class="tab" data-tab="mutual">맞팔 (<span id="tabMutual">0</span>)</button>
-            <button class="tab" data-tab="onlyMe">나만 팔로우 (<span id="tabOnlyMe">0</span>)</button>
-            <button class="tab" data-tab="fansOnly">상대만 팔로우 (<span id="tabFansOnly">0</span>)</button>
-            <button class="tab" data-tab="neither">서로 안 함 (<span id="tabNeither">0</span>)</button>
-          </div>
-          <div class="table-head"><span>번호</span><span>닉네임</span><span>아이디</span><span>상태</span><span>바로가기</span></div>
-          <div id="list" class="list"></div>
-        </section>
+      <div class="sectionTitle" style="margin-top:17px">공지 관리</div>
+      <textarea id="noticeInput" rows="4" placeholder="공지 내용을 입력하세요"></textarea>
+      <div class="row">
+        <button onclick="saveNotice()">공지 저장</button>
+        <button class="light" onclick="deleteNotice()">공지 삭제</button>
       </div>
-    </section>
 
-    <section id="noticeView" class="view">
-      <section class="card notice-page-card">
-        <div class="section-title-row">
-          <h2>공지</h2>
-          <button id="refreshNoticeBtn" class="icon-btn" type="button" aria-label="공지 새로고침" title="공지 새로고침">↻</button>
-        </div>
-        <div id="noticePageList" class="notice-page-list">
-          <p class="state-text">등록된 공지가 없습니다.</p>
-        </div>
-      </section>
-    </section>
+      <div class="sectionTitle" style="margin-top:17px">운영 통계</div>
+      <div class="stats">
+        <div class="stat"><b id="adminRoomCount">0</b><span>방 명단</span></div>
+        <div class="stat"><b id="adminMutual">0</b><span>맞팔</span></div>
+        <div class="stat"><b id="adminIssue">0</b><span>확인 필요</span></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <section id="adminView" class="view">
-      <section class="card" id="adminLoginCard">
-        <h2>운영진 로그인</h2>
-        <div class="admin-login">
-          <input id="adminPassword" type="password" inputmode="numeric" placeholder="운영진 비밀번호" />
-          <button id="adminLoginBtn" class="primary small-primary" type="button">로그인</button>
-        </div>
-        <p id="adminLoginMsg" class="error-text"></p>
-      </section>
+<nav class="bottom">
+  <button onclick="showPage('list')">📋<br>리스트</button>
+  <button onclick="showPage('check')">🔎<br>맞팔확인</button>
+  <button onclick="openAdmin()">🔒<br>운영진</button>
+</nav>
 
-      <section id="adminPanel" class="card hidden">
-        <div class="section-title-row">
-          <div>
-            <h2>운영진 기능</h2>
-          </div>
-          <button id="adminLogoutBtn" class="outline small" type="button">로그아웃</button>
-        </div>
+<script>
+const SHEET_ID="1m14GywxIymZp6p9izJ6QVWaC8fCnjr5F5OdXCKKUcss";
+const SHEET_NAME="Sheet1";
+const ADMIN_PASSWORD="0702";
+const PAGE_SIZE=500;
 
-        <div class="admin-actions">
-          <button id="openSheetBtn" class="outline" type="button">구글시트 열기</button>
-          <button id="adminRefreshBtn" class="outline" type="button">전체 새로고침</button>
-        </div>
+let roomData=[];
+let listPage="전체";
+let followers=new Set();
+let following=new Set();
+let checkResults=[];
+let checkFilter="all";
 
-        <div class="stats-grid compact admin-stats">
-          <article><span>전체 인원</span><strong id="adminTotal">0명</strong></article>
-          <article><span>전체 조</span><strong id="adminGroups">0조</strong></article>
-          <article><span>공지 수</span><strong id="adminNotices">0개</strong></article>
-          <article><span>API 상태</span><strong id="adminApiState">대기</strong></article>
-        </div>
+function showPage(page){
+  document.getElementById("listPage").classList.toggle("hidden",page!=="list");
+  document.getElementById("checkPage").classList.toggle("hidden",page!=="check");
+  document.getElementById("tabList").classList.toggle("active",page==="list");
+  document.getElementById("tabCheck").classList.toggle("active",page==="check");
+  window.scrollTo(0,0);
+}
 
-        <hr />
-        <div class="setting-block">
-          <div class="section-title-row">
-            <div><h3>앱 잠금</h3></div>
-            <span id="appLockState" class="lock-state unlocked">사용 가능</span>
-          </div>
-          <div class="admin-actions">
-            <button id="lockAppBtn" class="outline danger-outline" type="button">앱 잠그기</button>
-            <button id="unlockAppBtn" class="outline success-outline" type="button">앱 잠금 해제</button>
-          </div>
-        </div>
+function norm(v){
+  return String(v||"")
+    .trim()
+    .replace(/^@/,"")
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//i,"")
+    .split(/[/?#]/)[0]
+    .replace(/\/$/,"")
+    .toLowerCase();
+}
 
-        <hr />
-        <div class="setting-block">
-          <h3>접속 비밀번호 변경</h3>
-          
-          <div class="setting-row">
-            <input id="newAccessPassword" type="password" inputmode="numeric" placeholder="새 접속 비밀번호" />
-            <button id="changeAccessPasswordBtn" class="outline" type="button">접속 비밀번호 변경</button>
-          </div>
-        </div>
+function roomJsonp(){
+  return new Promise((resolve,reject)=>{
+    const cb="roomCb"+Date.now();
+    const s=document.createElement("script");
+    const timer=setTimeout(()=>{cleanup();reject(new Error("timeout"))},12000);
+    function cleanup(){clearTimeout(timer);try{delete window[cb]}catch(e){};s.remove()}
+    window[cb]=json=>{cleanup();resolve(json)};
+    s.onerror=()=>{cleanup();reject(new Error("load"))};
+    s.src="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?sheet="+encodeURIComponent(SHEET_NAME)+"&tqx=responseHandler:"+cb+";out:json&cache="+Date.now();
+    document.head.appendChild(s);
+  });
+}
 
-        <hr />
-        <div class="setting-block">
-          <div class="section-title-row">
-            <div><h3>팔로우리스트 잠금</h3></div>
-            <span id="followLockState" class="lock-state unlocked">사용 가능</span>
-          </div>
-          <div class="admin-actions">
-            <button id="lockFollowBtn" class="outline danger-outline" type="button">팔로우리스트 잠그기</button>
-            <button id="unlockFollowBtn" class="outline success-outline" type="button">팔로우리스트 잠금 해제</button>
-          </div>
-          <div class="setting-row">
-            <input id="newFollowPassword" type="password" inputmode="numeric" placeholder="새 팔로우리스트 비밀번호" />
-            <button id="changeFollowPasswordBtn" class="outline" type="button">팔로우리스트 비밀번호 변경</button>
-          </div>
-        </div>
+async function loadRoomList(){
+  document.getElementById("listCount").textContent="불러오는 중...";
+  try{
+    const json=await roomJsonp();
+    const rows=(json.table&&json.table.rows)||[];
+    roomData=rows.map(r=>{
+      const c=r.c||[];
+      return {
+        no:Number(String(c[0]?.v??"").replace(/[^0-9]/g,"")),
+        nickname:String(c[1]?.v??"").trim(),
+        id:norm(c[2]?.v??"")
+      };
+    }).filter(x=>x.no&&x.nickname&&x.id).sort((a,b)=>a.no-b.no);
 
-        <hr />
-        <div class="setting-block">
-          <div class="section-title-row">
-            <div><h3>맞팔 잠금</h3></div>
-            <span id="matchLockState" class="lock-state unlocked">사용 가능</span>
-          </div>
-          <div class="admin-actions">
-            <button id="lockMatchBtn" class="outline danger-outline" type="button">맞팔확인 잠그기</button>
-            <button id="unlockMatchBtn" class="outline success-outline" type="button">맞팔확인 잠금 해제</button>
-          </div>
-          <div class="setting-row">
-            <input id="newMatchPassword" type="password" inputmode="numeric" placeholder="새 맞팔확인 비밀번호" />
-            <button id="changeMatchPasswordBtn" class="outline" type="button">맞팔 비밀번호 변경</button>
-          </div>
-        </div>
+    document.getElementById("adminRoomCount").textContent=roomData.length.toLocaleString();
+    makePageButtons();
+    renderRoomList();
+    if(followers.size||following.size) buildCheckResults();
+  }catch(e){
+    document.getElementById("listCount").textContent="연동 오류";
+    document.getElementById("roomList").innerHTML='<div class="empty">명단을 불러오지 못했습니다.</div>';
+  }
+}
 
-        <hr />
-        <div class="setting-block">
-          <h3>공지 관리</h3>
-          <textarea id="noticeBody" placeholder="공지 내용을 입력하세요."></textarea>
-          <button id="saveNoticeBtn" class="primary" type="button">공지 저장</button>
-          <div id="adminNoticeList" class="admin-notice-list"></div>
-        </div>
-        <hr />
-        <div class="setting-block">
-          <div class="section-title-row">
-            <div><h3>운영진 로그</h3><p class="subtext">최근 설정 변경과 공지 작업을 확인합니다.</p></div>
-            <button id="refreshLogsBtn" class="outline small" type="button">새로고침</button>
-          </div>
-          <div id="adminLogList" class="admin-log-list"><p class="state-text">로그를 불러오려면 새로고침을 눌러주세요.</p></div>
-        </div>
+function makePageButtons(){
+  const maxNo=roomData.length?Math.max(...roomData.map(x=>x.no)):0;
+  const count=Math.ceil(maxNo/PAGE_SIZE);
+  let html='<button class="'+(listPage==="전체"?"active":"")+'" onclick="setListPage(\'전체\')">전체</button>';
+  for(let i=0;i<count;i++){
+    const start=i*PAGE_SIZE+1;
+    const end=Math.min((i+1)*PAGE_SIZE,maxNo);
+    html+='<button class="'+(listPage===i?"active":"")+'" onclick="setListPage('+i+')">'+start+'~'+end+'</button>';
+  }
+  document.getElementById("pageButtons").innerHTML=html;
+}
 
-      </section>
-    </section>
-  </main>
+function setListPage(v){listPage=v;makePageButtons();renderRoomList()}
 
-  <footer><span>© 2026 YEOWOOBANG</span><span>Version 32.0</span></footer>
+function esc(s){
+  return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
 
-  <nav class="bottom-nav" aria-label="주요 메뉴">
-    <button class="nav-btn active" data-view="followView" type="button">
-      <span class="nav-icon">☷</span><span>팔로우리스트</span>
-    </button>
-    <button class="nav-btn" data-view="matchView" type="button">
-      <span class="nav-icon">↔</span><span>맞팔확인</span>
-    </button>
-    <button id="noticeNavBtn" class="nav-btn" data-view="noticeView" type="button">
-      <span class="nav-icon">🔔</span><span>공지</span>
-    </button>
-    <button id="adminNavBtn" class="nav-btn hidden" data-view="adminView" type="button">
-      <span class="nav-icon">⚙</span><span>운영진</span>
-    </button>
-  </nav>
+function renderRoomList(){
+  const q=document.getElementById("listSearch").value.toLowerCase().trim();
+  const arr=roomData.filter(x=>{
+    const search=(x.no+" "+x.nickname+" "+x.id).toLowerCase().includes(q);
+    if(listPage==="전체") return search;
+    const start=listPage*PAGE_SIZE+1,end=(listPage+1)*PAGE_SIZE;
+    return search&&x.no>=start&&x.no<=end;
+  });
 
-  <div id="toast" class="toast"></div>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="app.js?v=322"></script>
+  document.getElementById("listCount").textContent="검색 결과 "+arr.length.toLocaleString()+"명";
+  document.getElementById("roomList").innerHTML=arr.length?arr.map(x=>
+    '<div class="person"><div class="main"><div class="name">'+x.no+'. '+esc(x.nickname)+'</div><div class="id">@'+esc(x.id)+'</div></div><span></span><a class="instaBtn" target="_blank" href="https://instagram.com/'+encodeURIComponent(x.id)+'">인스타</a></div>'
+  ).join(""):'<div class="empty">표시할 인원이 없습니다.</div>';
+}
+
+async function analyzeZip(){
+  const file=document.getElementById("instagramZip").files[0];
+  if(!file){alert("인스타그램 ZIP 파일을 선택해주세요.");return}
+  if(typeof JSZip==="undefined"){alert("ZIP 분석 도구를 불러오지 못했습니다.");return}
+
+  document.getElementById("zipProgress").textContent="ZIP 파일 읽는 중...";
+  try{
+    const zip=await JSZip.loadAsync(file);
+    const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir);
+
+    const followerFiles=names.filter(n=>/(^|\/)(followers(_\d+)?|followers_and_following\/followers(_\d+)?)\.(html|json)$/i.test(n));
+    const followingFiles=names.filter(n=>/(^|\/)(following|followers_and_following\/following)\.(html|json)$/i.test(n));
+
+    if(!followerFiles.length||!followingFiles.length){
+      throw new Error("팔로워 또는 팔로잉 파일을 찾지 못했습니다.");
+    }
+
+    const followerIds=new Set();
+    const followingIds=new Set();
+
+    for(const name of followerFiles){
+      const text=await zip.file(name).async("text");
+      parseInstagramFile(name,text,"followers").forEach(id=>followerIds.add(id));
+    }
+
+    for(const name of followingFiles){
+      const text=await zip.file(name).async("text");
+      parseInstagramFile(name,text,"following").forEach(id=>followingIds.add(id));
+    }
+
+    followers=followerIds;
+    following=followingIds;
+
+    if(!roomData.length) await loadRoomList();
+    buildCheckResults();
+
+    document.getElementById("zipProgress").textContent=
+      "분석 완료 · 팔로워 "+followers.size.toLocaleString()+"명 / 팔로잉 "+following.size.toLocaleString()+"명";
+    document.getElementById("checkResults").classList.remove("hidden");
+  }catch(e){
+    document.getElementById("zipProgress").textContent="분석 실패";
+    alert(e.message||"ZIP 파일 분석에 실패했습니다.");
+  }
+}
+
+function parseInstagramFile(name,text,type){
+  if(/\.json$/i.test(name)) return parseInstagramJson(text,type);
+  return parseInstagramHtml(text);
+}
+
+function parseInstagramHtml(text){
+  const doc=new DOMParser().parseFromString(text,"text/html");
+  const ids=new Set();
+  doc.querySelectorAll("a").forEach(a=>{
+    const href=a.getAttribute("href")||"";
+    const txt=(a.textContent||"").trim();
+    let id="";
+    const m=href.match(/instagram\.com\/([^/?#]+)/i);
+    if(m) id=m[1];
+    else if(/^[A-Za-z0-9._]+$/.test(txt)) id=txt;
+    id=norm(id);
+    if(id&&/^[a-z0-9._]+$/.test(id)) ids.add(id);
+  });
+  return [...ids];
+}
+
+function parseInstagramJson(text,type){
+  const ids=new Set();
+  const obj=JSON.parse(text);
+
+  if(type==="followers"){
+    walkFollowerJson(obj,ids);
+  }else{
+    walkFollowingJson(obj,ids);
+  }
+
+  return [...ids];
+}
+
+function walkFollowerJson(value,ids){
+  if(Array.isArray(value)){
+    value.forEach(v=>walkFollowerJson(v,ids));
+    return;
+  }
+  if(!value||typeof value!=="object") return;
+
+  if(Array.isArray(value.string_list_data)){
+    value.string_list_data.forEach(item=>{
+      const id=norm(item.value||item.href||"");
+      if(id&&/^[a-z0-9._]+$/.test(id)) ids.add(id);
+    });
+  }
+
+  Object.values(value).forEach(v=>walkFollowerJson(v,ids));
+}
+
+function walkFollowingJson(value,ids){
+  if(Array.isArray(value)){
+    value.forEach(v=>walkFollowingJson(v,ids));
+    return;
+  }
+  if(!value||typeof value!=="object") return;
+
+  if(Array.isArray(value.relationships_following)){
+    value.relationships_following.forEach(entry=>{
+      if(Array.isArray(entry.string_list_data)){
+        entry.string_list_data.forEach(item=>{
+          const id=norm(item.value||item.href||"");
+          if(id&&/^[a-z0-9._]+$/.test(id)) ids.add(id);
+        });
+      }
+      const titleId=norm(entry.title||"");
+      if(titleId&&/^[a-z0-9._]+$/.test(titleId)) ids.add(titleId);
+    });
+  }
+
+  if(Array.isArray(value.string_list_data)){
+    value.string_list_data.forEach(item=>{
+      const id=norm(item.value||item.href||"");
+      if(id&&/^[a-z0-9._]+$/.test(id)) ids.add(id);
+    });
+  }
+
+  Object.values(value).forEach(v=>walkFollowingJson(v,ids));
+}
+
+function buildCheckResults(){
+  const roomMap=new Map(roomData.map(x=>[x.id,x]));
+  const all=new Set([...followers,...following]);
+
+  checkResults=[...all].map(id=>{
+    const f=followers.has(id),g=following.has(id);
+    let status="";
+    if(f&&g) status="mutual";
+    else if(g&&!f) status="onlyMe";
+    else if(f&&!g) status="onlyThem";
+    const r=roomMap.get(id);
+    return {id,no:r?r.no:"",nickname:r?r.nickname:"",status};
+  }).sort((a,b)=>(a.no||999999)-(b.no||999999)||a.id.localeCompare(b.id));
+
+  const mutual=checkResults.filter(x=>x.status==="mutual").length;
+  const onlyMe=checkResults.filter(x=>x.status==="onlyMe").length;
+  const onlyThem=checkResults.filter(x=>x.status==="onlyThem").length;
+
+  document.getElementById("mutualCount").textContent=mutual.toLocaleString();
+  document.getElementById("onlyMeCount").textContent=onlyMe.toLocaleString();
+  document.getElementById("onlyThemCount").textContent=onlyThem.toLocaleString();
+  document.getElementById("adminMutual").textContent=mutual.toLocaleString();
+  document.getElementById("adminIssue").textContent=(onlyMe+onlyThem).toLocaleString();
+  renderCheck();
+}
+
+function setCheckFilter(v,el){
+  checkFilter=v;
+  document.querySelectorAll(".filterBtns button").forEach(b=>b.classList.remove("active"));
+  el.classList.add("active");
+  renderCheck();
+}
+
+function badge(s){
+  if(s==="mutual")return '<span class="status green">맞팔</span>';
+  if(s==="onlyMe")return '<span class="status red">나만</span>';
+  if(s==="onlyThem")return '<span class="status yellow">상대만</span>';
+  return '<span class="status gray">확인</span>';
+}
+
+function renderCheck(){
+  const q=(document.getElementById("checkSearch")?.value||"").toLowerCase().trim();
+  const arr=checkResults.filter(x=>(checkFilter==="all"||x.status===checkFilter)&&(x.nickname+" "+x.id+" "+x.no).toLowerCase().includes(q));
+  document.getElementById("checkList").innerHTML=arr.length?arr.map(x=>
+    '<div class="person"><div class="main"><div class="name">'+esc((x.no?x.no+". ":"")+(x.nickname||x.id))+'</div><div class="id">@'+esc(x.id)+'</div></div>'+badge(x.status)+'<a class="instaBtn" target="_blank" href="https://instagram.com/'+encodeURIComponent(x.id)+'">인스타</a></div>'
+  ).join(""):'<div class="empty">표시할 결과가 없습니다.</div>';
+}
+
+function openAdmin(){document.getElementById("adminModal").style.display="flex"}
+function closeAdmin(){document.getElementById("adminModal").style.display="none"}
+function adminLogin(){
+  if(document.getElementById("adminPw").value===ADMIN_PASSWORD){
+    document.getElementById("adminPanel").classList.remove("hidden");
+  }else alert("비밀번호가 틀렸습니다.");
+}
+
+function saveNotice(){
+  const v=document.getElementById("noticeInput").value.trim();
+  localStorage.setItem("yeowooNotice",v);
+  showNotice();
+  alert("공지 저장 완료");
+}
+function deleteNotice(){
+  localStorage.removeItem("yeowooNotice");
+  document.getElementById("noticeInput").value="";
+  showNotice();
+  alert("공지 삭제 완료");
+}
+function showNotice(){
+  const v=localStorage.getItem("yeowooNotice")||"";
+  const box=document.getElementById("noticeBox");
+  if(v){
+    box.style.display="block";
+    box.textContent="📢 "+v;
+    document.getElementById("noticeInput").value=v;
+  }else{
+    box.style.display="none";
+    box.textContent="";
+  }
+}
+
+
+showNotice();
+loadRoomList();
+</script>
 </body>
 </html>
