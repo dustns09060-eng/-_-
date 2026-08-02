@@ -16,6 +16,9 @@ let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
 const APP_VERSION = "V33";
+const ROOM_CACHE_KEY = "yb_room_list_v33";
+const ROOM_CACHE_TIME_KEY = "yb_room_list_time_v33";
+const ROOM_CACHE_MAX_AGE = 10 * 60 * 1000;
 
 let config = {
   version: "V32 POLISHED UI",
@@ -259,11 +262,22 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  await Promise.allSettled([
-    refreshPublicConfig(false),
-    loadNotices(false),
-  ]);
-  await loadRoomList(false, true);
+  const cached = restoreRoomCache();
+  if (cached) {
+    setSheetState("캐시");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+  }
+
+  await Promise.allSettled([loadNotices(false), refreshPublicConfig(false)]);
+
+  if (cached) {
+    refreshRoomListRemote(false).catch(() => {});
+  } else {
+    await refreshRoomListRemote(false);
+  }
+
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
 }
@@ -431,46 +445,122 @@ function rowsToRoom(rows) {
   return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
 }
 
-async function loadRoomList(show = false, force = false) {
-  if (!force && roomList.length) {
-    setSheetState("정상");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-    return;
+function restoreRoomCache() {
+  try {
+    const raw = localStorage.getItem(ROOM_CACHE_KEY);
+    if (!raw) return false;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list) || !list.length) return false;
+    roomList = list.filter(item => item && validUsername(normalize(item.id))).map((item, index) => ({
+      no: item.no || index + 1,
+      name: item.name || "",
+      id: normalize(item.id),
+    }));
+    return roomList.length > 0;
+  } catch (_) {
+    return false;
   }
+}
+
+function saveRoomCache() {
+  try {
+    localStorage.setItem(ROOM_CACHE_KEY, JSON.stringify(roomList));
+    localStorage.setItem(ROOM_CACHE_TIME_KEY, String(Date.now()));
+  } catch (_) {}
+}
+
+function roomCacheIsFresh() {
+  const time = Number(localStorage.getItem(ROOM_CACHE_TIME_KEY) || 0);
+  return Boolean(time && Date.now() - time < ROOM_CACHE_MAX_AGE);
+}
+
+async function refreshRoomListRemote(show = false) {
   setSheetState("불러오는 중");
   let lastError = "";
+
   try {
     const data = await apiGet("roomList");
-    roomList = (data.members || []).map((item, index) => ({
+    const nextList = (data.members || []).map((item, index) => ({
       no: item.no || index + 1,
       name: item.name || "",
       id: normalize(item.id),
     })).filter((item) => validUsername(item.id));
-    if (!roomList.length) throw new Error("API 명단 0명");
+
+    if (!nextList.length) throw new Error("API 명단 0명");
+
+    const changed = JSON.stringify(nextList) !== JSON.stringify(roomList);
+    roomList = nextList;
+    saveRoomCache();
     setSheetState("정상");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
+    if (changed || !$("followList").children.length) {
+      updateFollowStats();
+      renderGroupTabs();
+      renderFollowList();
+    }
     if (show) toast("명단 새로고침 완료");
-    return;
-  } catch (error) { lastError = error.message; }
-  try {
-    const response = await fetch(config.fallbackCsv || "room-list.csv", { cache: "force-cache" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    roomList = rowsToRoom(parseCsv(await response.text()));
-    if (!roomList.length) throw new Error("백업 명단 0명");
-    setSheetState("백업");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-    if (show) toast("백업 명단으로 불러왔습니다.");
-    return;
-  } catch (error) { lastError = error.message; }
+    return true;
+  } catch (error) {
+    lastError = error.message;
+  }
+
+  const urls = [];
+  if (config.sheetId) {
+    const sheet = encodeURIComponent(config.sheetName || "Sheet1");
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
+  }
+  urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const list = rowsToRoom(parseCsv(await response.text()));
+      if (!list.length) throw new Error("0명");
+      const changed = JSON.stringify(list) !== JSON.stringify(roomList);
+      roomList = list;
+      saveRoomCache();
+      setSheetState("백업");
+      if (changed || !$("followList").children.length) {
+        updateFollowStats();
+        renderGroupTabs();
+        renderFollowList();
+      }
+      if (show) toast("백업 명단으로 불러왔습니다.");
+      return true;
+    } catch (error) {
+      lastError = error.message;
+    }
+  }
+
+  if (roomList.length) {
+    setSheetState("캐시");
+    if (show) toast("저장된 명단을 표시합니다.");
+    return false;
+  }
+
   setSheetState("오류");
   $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
   if (show) toast("명단 불러오기 실패");
+  return false;
+}
+
+async function loadRoomList(show = false, force = false) {
+  const restored = roomList.length > 0 || restoreRoomCache();
+  if (restored) {
+    setSheetState("캐시");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+  }
+
+  if (!force && restored && roomCacheIsFresh()) {
+    refreshRoomListRemote(false).catch(() => {});
+    if (show) toast("저장된 명단을 빠르게 불러왔습니다.");
+    return;
+  }
+
+  await refreshRoomListRemote(show);
 }
 
 function setSheetState(state) {
@@ -950,7 +1040,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=333").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=334").catch(() => {});
   }
 
   setInterval(async () => {
