@@ -11,7 +11,6 @@ let publicConfig = null;
 let accessGranted = false;
 let appLockGranted = false;
 let matchGranted = false;
-let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
@@ -239,7 +238,6 @@ async function submitGatePassword() {
       adminPasswordValue = password;
       accessGranted = true;
       matchGranted = true;
-      followGranted = true;
       setAdminNavigation(true);
       hideGate();
       await loadAfterAuth();
@@ -268,7 +266,6 @@ async function refreshPublicConfig(recheck = true) {
   const previousSecurity = securityVersion || publicConfig?.securityVersion || "";
   publicConfig = await apiGet("publicConfig");
   updateLockIndicators();
-  applyFollowLock();
   applyMatchLock();
   checkVersionUpdate();
 
@@ -278,7 +275,6 @@ async function refreshPublicConfig(recheck = true) {
     accessGranted = false;
     appLockGranted = false;
     matchGranted = false;
-    followGranted = false;
     toast("보안 설정이 변경되어 다시 로그인합니다.");
     setAdminNavigation(false);
     await bootstrapAuth();
@@ -298,7 +294,6 @@ function checkVersionUpdate() {
 function updateLockIndicators() {
   const appLocked = Boolean(publicConfig?.appLocked);
   const matchLocked = Boolean(publicConfig?.matchLocked);
-  const followLocked = Boolean(publicConfig?.followLocked);
 
   if ($("appLockState")) {
     $("appLockState").textContent = appLocked ? "잠금 중" : "사용 가능";
@@ -308,36 +303,6 @@ function updateLockIndicators() {
   if ($("matchLockState")) {
     $("matchLockState").textContent = matchLocked ? "잠금 중" : "사용 가능";
     $("matchLockState").className = `lock-state ${matchLocked ? "locked" : "unlocked"}`;
-  }
-
-  if ($("followLockState")) {
-    $("followLockState").textContent = followLocked ? "잠금 중" : "사용 가능";
-    $("followLockState").className = `lock-state ${followLocked ? "locked" : "unlocked"}`;
-  }
-}
-
-function applyFollowLock() {
-  const locked = Boolean(publicConfig?.followLocked) && !followGranted && !adminLoggedIn;
-  $("followLockCard")?.classList.toggle("hidden", !locked);
-  $("followContent")?.classList.toggle("hidden", locked);
-}
-
-async function unlockFollow() {
-  const password = $("followPassword").value.trim();
-  if (!password) {
-    $("followUnlockMsg").textContent = "비밀번호를 입력해 주세요.";
-    return;
-  }
-
-  try {
-    await apiPost("verifyFollowPassword", { password });
-    followGranted = true;
-    $("followUnlockMsg").textContent = "";
-    $("followPassword").value = "";
-    applyFollowLock();
-    toast("팔로우리스트 잠금이 해제되었습니다.");
-  } catch (_) {
-    $("followUnlockMsg").textContent = "팔로우리스트 비밀번호가 올바르지 않습니다.";
   }
 }
 
@@ -428,7 +393,14 @@ function rowsToRoom(rows) {
   return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
 }
 
-async function loadRoomList(show = false) {
+async function loadRoomList(show = false, force = false) {
+  if (!force && roomList.length) {
+    setSheetState("정상");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+    return;
+  }
   setSheetState("불러오는 중");
   let lastError = "";
 
@@ -544,7 +516,6 @@ function renderFollowList() {
 function showView(id) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === id));
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === id));
-  if (id === "followView") applyFollowLock();
   if (id === "matchView") applyMatchLock();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -727,26 +698,6 @@ async function copyCurrent() {
   toast("복사 완료");
 }
 
-function downloadCsv() {
-  const items = matchFiltered();
-  if (!items.length) return toast("다운로드할 명단이 없습니다.");
-
-  const rows = [
-    ["번호", "닉네임", "아이디", "상태"],
-    ...items.map((item, index) => [index + 1, item.name, `@${item.id}`, statusLabel(item.status)]),
-  ];
-  const csv = "\ufeff" + rows
-    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
-    .join("\r\n");
-
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "여우방_명단.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function resetAnalysis() {
   $("zipFile").value = "";
   $("fileName").textContent = "인스타그램 ZIP 파일 선택";
@@ -827,8 +778,6 @@ async function adminLogin() {
     showAdminPanel();
     loadAdminLogs();
     matchGranted = true;
-    followGranted = true;
-    applyFollowLock();
     applyMatchLock();
     toast("운영진 로그인 완료");
   } catch (_) {
@@ -847,12 +796,10 @@ function adminLogout() {
   adminPasswordValue = "";
   accessGranted = false;
   matchGranted = false;
-  followGranted = false;
   $("adminPanel").classList.add("hidden");
   $("adminLoginCard").classList.remove("hidden");
   $("adminPassword").value = "";
   setAdminNavigation(false);
-  applyFollowLock();
   applyMatchLock();
   bootstrapAuth();
 }
@@ -910,11 +857,8 @@ $("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGate
 $("gateRetryBtn").onclick = bootstrapAuth;
 
 $("followSearch").oninput = renderFollowList;
-$("refreshFollowBtn").onclick = () => loadRoomList(true);
-$("reloadRoomBtn").onclick = () => loadRoomList(true);
-
-$("followUnlockBtn").onclick = unlockFollow;
-$("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
+$("refreshFollowBtn").onclick = () => loadRoomList(true, true);
+$("reloadRoomBtn").onclick = () => loadRoomList(true, true);
 
 $("matchUnlockBtn").onclick = unlockMatch;
 $("matchPassword").onkeydown = (event) => { if (event.key === "Enter") unlockMatch(); };
@@ -926,7 +870,6 @@ $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
 $("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
-$("csvBtn").onclick = downloadCsv;
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -936,19 +879,16 @@ $("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogi
 $("adminLogoutBtn").onclick = adminLogout;
 $("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
 $("adminRefreshBtn").onclick = async () => {
-  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true, true), loadNotices(false), loadAdminLogs()]);
   toast("전체 새로고침 완료");
 };
 
 $("lockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: true }, "앱을 잠갔습니다.");
 $("unlockAppBtn").onclick = () => runAdminAction("setAppLock", { locked: false }, "앱 잠금을 해제했습니다.");
-$("lockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: true }, "팔로우리스트를 잠갔습니다.");
-$("unlockFollowBtn").onclick = () => runAdminAction("setFollowLock", { locked: false }, "팔로우리스트 잠금을 해제했습니다.");
 $("lockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: true }, "맞팔확인을 잠갔습니다.");
 $("unlockMatchBtn").onclick = () => runAdminAction("setMatchLock", { locked: false }, "맞팔확인 잠금을 해제했습니다.");
 
 $("changeAccessPasswordBtn").onclick = () => changePassword("changeAccessPassword", "newAccessPassword", "접속 비밀번호를 변경했습니다.");
-$("changeFollowPasswordBtn").onclick = () => changePassword("changeFollowPassword", "newFollowPassword", "팔로우리스트 비밀번호를 변경했습니다.");
 $("changeMatchPasswordBtn").onclick = () => changePassword("changeMatchPassword", "newMatchPassword", "맞팔확인 비밀번호를 변경했습니다.");
 
 $("saveNoticeBtn").onclick = saveNotice;
@@ -985,7 +925,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=320").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=332").catch(() => {});
   }
 
   setInterval(async () => {
@@ -996,7 +936,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
-      await Promise.allSettled([loadNotices(true), loadRoomList(false)]);
+      await loadNotices(true).catch(() => {});
     }
-  }, 60000);
+  }, 120000);
 });
