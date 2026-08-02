@@ -133,6 +133,13 @@ input[type=text],input[type=password],input[type=file],textarea{width:100%;paddi
         <div class="stat"><b id="adminMutual">0</b><span>맞팔</span></div>
         <div class="stat"><b id="adminIssue">0</b><span>확인 필요</span></div>
       </div>
+
+      <div class="sectionTitle" style="margin-top:17px">결과 다운로드</div>
+      <div class="downloads">
+        <button onclick="downloadCsv('mutual')">맞팔.csv</button>
+        <button onclick="downloadCsv('onlyMe')">나만.csv</button>
+        <button onclick="downloadCsv('onlyThem')">상대만.csv</button>
+      </div>
     </div>
   </div>
 </div>
@@ -451,6 +458,20 @@ function showNotice(){
   }
 }
 
+function downloadCsv(status){
+  const rows=checkResults.filter(x=>x.status===status);
+  if(!rows.length){alert("다운로드할 결과가 없습니다.");return}
+  const header=["번호","닉네임","아이디","상태"];
+  const labels={mutual:"맞팔",onlyMe:"나만 팔로우",onlyThem:"상대만 팔로우"};
+  const csv=[header,...rows.map(x=>[x.no||"",x.nickname||"", "@"+x.id,labels[x.status]])]
+    .map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=labels[status]+".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 showNotice();
 loadRoomList();

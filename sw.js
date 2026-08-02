@@ -1,4 +1,4 @@
-const CACHE='yb-backup-no-csv-v1';
+const CACHE='yb-v320';
 const ASSETS=[
   './',
   './index.html',
