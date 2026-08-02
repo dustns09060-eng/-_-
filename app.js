@@ -16,10 +16,10 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V35";
+const APP_VERSION = "V35.1";
 
 let config = {
-  version: "V35 STABLE",
+  version: "V35.1 STABLE",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -365,6 +365,7 @@ async function unlockMatch() {
     $("matchUnlockMsg").textContent = "";
     $("matchPassword").value = "";
     applyMatchLock();
+    await loadMatchRoomList(false).catch(() => {});
     toast("맞팔확인 잠금이 해제되었습니다.");
   } catch (_) {
     $("matchUnlockMsg").textContent = "맞팔확인 비밀번호가 올바르지 않습니다.";
@@ -490,10 +491,20 @@ async function loadRoomList(show = false) {
 
 
 async function loadMatchRoomList(show = false, force = false) {
-  if (!force && matchRoomList.length) return matchRoomList;
+  if (!force && matchRoomList.length) {
+    if ($("roomState")) {
+      $("roomState").textContent = `${matchRoomList.length}명 준비 완료`;
+    }
+    return matchRoomList;
+  }
+
+  if ($("roomState")) {
+    $("roomState").textContent = "불러오는 중";
+  }
 
   try {
     const data = await apiGet("matchList");
+
     matchRoomList = (data.members || [])
       .map((item, index) => ({
         no: item.no || index + 1,
@@ -502,23 +513,42 @@ async function loadMatchRoomList(show = false, force = false) {
       }))
       .filter((item) => validUsername(item.id));
 
-    if (!matchRoomList.length) throw new Error("맞팔확인용 명단 0명");
-    if (show) toast(`맞팔확인용 명단 ${matchRoomList.length}명 새로고침 완료`);
+    if (!matchRoomList.length) {
+      throw new Error("맞팔확인용 명단이 비어 있습니다.");
+    }
+
+    if ($("roomState")) {
+      $("roomState").textContent = `${matchRoomList.length}명 준비 완료`;
+    }
+
+    if (show) {
+      toast(`맞팔확인용 명단 ${matchRoomList.length}명 새로고침 완료`);
+    }
+
     return matchRoomList;
   } catch (error) {
-    // Sheet2가 비어 있거나 연결이 실패하면 기존 팔로우리스트를 안전한 백업으로 사용합니다.
-    if (!roomList.length) await loadRoomList(false);
-    matchRoomList = [...roomList];
-    if (show) toast("맞팔확인용 명단 연결 실패 · 팔로우리스트를 사용합니다.");
-    return matchRoomList;
+    matchRoomList = [];
+
+    if ($("roomState")) {
+      $("roomState").textContent = "불러오기 오류";
+    }
+
+    if ($("status")) {
+      $("status").textContent = `맞팔확인용 명단을 불러오지 못했습니다. (${error.message})`;
+    }
+
+    if (show) {
+      toast("맞팔확인용 명단 불러오기 실패");
+    }
+
+    throw error;
   }
 }
 
 function setSheetState(state) {
-  if ($("roomState")) {
-    $("roomState").textContent = state === "정상" || state === "백업" ? `${roomList.length}명 준비 완료` : state;
+  if ($("adminApiState")) {
+    $("adminApiState").textContent = state;
   }
-  if ($("adminApiState")) $("adminApiState").textContent = state;
 }
 
 function updateFollowStats() {
@@ -575,8 +605,19 @@ function renderFollowList() {
 function showView(id) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === id));
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === id));
-  if (id === "followView") applyFollowLock();
-  if (id === "matchView") applyMatchLock();
+
+  if (id === "followView") {
+    applyFollowLock();
+  }
+
+  if (id === "matchView") {
+    applyMatchLock();
+    const locked = Boolean(publicConfig?.matchLocked) && !matchGranted && !adminLoggedIn;
+    if (!locked && !matchRoomList.length) {
+      loadMatchRoomList(false).catch(() => {});
+    }
+  }
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -922,7 +963,7 @@ $("gateRetryBtn").onclick = bootstrapAuth;
 
 $("followSearch").oninput = renderFollowList;
 $("refreshFollowBtn").onclick = () => loadRoomList(true);
-$("reloadRoomBtn").onclick = () => loadRoomList(true);
+$("reloadRoomBtn").onclick = () => loadMatchRoomList(true, true);
 
 $("followUnlockBtn").onclick = unlockFollow;
 $("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
@@ -995,7 +1036,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=350").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=352").catch(() => {});
   }
 
   setInterval(async () => {
