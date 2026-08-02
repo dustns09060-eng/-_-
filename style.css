@@ -499,3 +499,5 @@ body.gate-open{overflow:hidden}
     padding:14px;
   }
 }
+
+.disabled{opacity:.48;pointer-events:none}

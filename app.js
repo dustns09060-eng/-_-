@@ -15,7 +15,7 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V33.4";
+const APP_VERSION = "V33.5";
 
 let config = {
   version: "V32 POLISHED UI",
@@ -424,22 +424,26 @@ function parseCsv(text) {
 
 function rowsToRoom(rows) {
   const list = [];
-  rows.forEach((row, index) => {
-    const joined = row.join(" ");
-    if (index === 0 && (joined.includes("번호") || joined.includes("닉네임") || joined.includes("아이디"))) return;
 
-    const id = normalize(row[2] || row[1] || row[0]);
-    if (validUsername(id)) {
-      list.push({
-        no: row[0] || list.length + 1,
-        name: row[1] || "",
-        id,
-      });
-    }
+  rows.forEach((row) => {
+    const noText = String(row[0] || "").trim();
+    const name = String(row[1] || "").trim();
+    const rawId = String(row[2] || "").trim();
+
+    // 번호가 있고 닉네임 또는 아이디가 있는 실제 회원 행은 모두 유지합니다.
+    if (!/^\d+$/.test(noText)) return;
+    if (!name && !rawId) return;
+
+    list.push({
+      no: Number(noText),
+      name,
+      id: normalize(rawId),
+      rawId,
+    });
   });
 
-  const seen = new Set();
-  return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
+  // 중복 아이디도 각각의 회원 번호로 유지합니다.
+  return list.sort((a, b) => Number(a.no) - Number(b.no));
 }
 
 async function loadRoomList(show = false, force = false) {
@@ -470,29 +474,11 @@ async function loadRoomList(show = false, force = false) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const rows = parseCsv(await response.text());
-      const list = [];
-      const seenRows = new Set();
-
-      rows.forEach((row) => {
-        const noText = String(row[0] || "").trim();
-        const name = String(row[1] || "").trim();
-        const rawId = String(row[2] || "").trim();
-        const id = normalize(rawId);
-
-        // 번호·닉네임·아이디가 모두 있는 실제 회원 행만 사용합니다.
-        if (!/^\d+$/.test(noText)) return;
-        if (!name || !rawId || !validUsername(id)) return;
-        if (/^\d+$/.test(id)) return;
-
-        const key = `${noText}|${name}|${id}`;
-        if (seenRows.has(key)) return;
-        seenRows.add(key);
-        list.push({ no: Number(noText), name, id });
-      });
+      const list = rowsToRoom(rows);
 
       if (!list.length) throw new Error("명단 0명");
 
-      roomList = list.sort((a, b) => Number(a.no) - Number(b.no));
+      roomList = list;
       setSheetState(url.includes("docs.google.com") ? "정상" : "백업");
       updateFollowStats();
       renderGroupTabs();
@@ -549,7 +535,7 @@ function followFiltered() {
   return query
     ? items.filter((item) =>
         String(item.no).includes(query) ||
-        item.id.includes(normalize(query)) ||
+        String(item.id || "").includes(normalize(query)) ||
         String(item.name).toLowerCase().includes(query))
     : items;
 }
@@ -557,13 +543,24 @@ function followFiltered() {
 function renderFollowList() {
   const items = followFiltered();
   $("followList").innerHTML = items.length
-    ? items.map((item) => `
+    ? items.map((item) => {
+      const hasId = validUsername(item.id);
+      const idText = hasId ? `@${escapeHtml(item.id)}` : "아이디 확인 필요";
+      const idCell = hasId
+        ? `<a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">${idText}</a>`
+        : `<span class="follow-id">${idText}</span>`;
+      const openButton = hasId
+        ? `<a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>`
+        : `<span class="insta-btn disabled" aria-disabled="true">확인 필요</span>`;
+
+      return `
       <div class="follow-item">
         <span class="follow-no">${escapeHtml(item.no)}</span>
-        <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
-        <a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">@${escapeHtml(item.id)}</a>
-        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
-      </div>`).join("")
+        <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name || "이름 없음")}</span>
+        ${idCell}
+        ${openButton}
+      </div>`;
+    }).join("")
     : '<div class="empty-state">검색 결과가 없습니다.</div>';
 }
 
@@ -723,23 +720,33 @@ function matchFiltered() {
   const query = String($("searchInput").value || "").trim().toLowerCase();
   const items = result[currentTab] || [];
   return query
-    ? items.filter((item) => item.id.includes(normalize(query)) || String(item.name).toLowerCase().includes(query))
+    ? items.filter((item) => String(item.id || "").includes(normalize(query)) || String(item.name).toLowerCase().includes(query))
     : items;
 }
 
 function renderMatchList() {
   const items = matchFiltered();
   $("list").innerHTML = items.length
-    ? items.map((item, index) => `
+    ? items.map((item, index) => {
+      const hasId = validUsername(item.id);
+      const idView = hasId
+        ? `<a class="id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>`
+        : `<span class="id">아이디 확인 필요</span>`;
+      const openView = hasId
+        ? `<a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>`
+        : `<span class="insta disabled" aria-disabled="true">확인 필요</span>`;
+
+      return `
       <div class="item">
         <span class="item-no">${index + 1}</span>
         <div class="item-person">
-          <strong class="item-name">${escapeHtml(item.name)}</strong>
-          <a class="id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener">@${escapeHtml(item.id)}</a>
+          <strong class="item-name">${escapeHtml(item.name || "이름 없음")}</strong>
+          ${idView}
         </div>
         <span class="badge ${item.status}">${statusLabel(item.status)}</span>
-        <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
-      </div>`).join("")
+        ${openView}
+      </div>`;
+    }).join("")
     : '<div class="empty-state">결과가 없습니다.</div>';
 }
 
@@ -986,7 +993,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=334").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=335").catch(() => {});
   }
 
   setInterval(async () => {

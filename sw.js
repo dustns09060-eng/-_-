@@ -1,9 +1,9 @@
-const CACHE='yb-v334-stable';
+const CACHE='yb-v335-stable';
 const ASSETS=[
-  './','./index.html','./style.css?v=334','./app.js?v=334',
-  './manifest.json?v=334','./config.json?v=334','./favicon-v20.png?v=334',
-  './icon-192-v20.png?v=334','./icon-512-v20.png?v=334',
-  './app-logo-v20.png?v=334','./preview-v26.png?v=334','./room-list.csv'
+  './','./index.html','./style.css?v=335','./app.js?v=335',
+  './manifest.json?v=335','./config.json?v=335','./favicon-v20.png?v=335',
+  './icon-192-v20.png?v=335','./icon-512-v20.png?v=335',
+  './app-logo-v20.png?v=335','./preview-v26.png?v=335','./room-list.csv'
 ];
 self.addEventListener('install',event=>{
   self.skipWaiting();
