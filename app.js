@@ -15,9 +15,10 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-let followRenderLimit = 80;
-let matchRenderLimit = 80;
 const APP_VERSION = "V33";
+const ROOM_CACHE_KEY = "yb_room_list_v33";
+const ROOM_CACHE_TIME_KEY = "yb_room_list_time_v33";
+const ROOM_CACHE_MAX_AGE = 10 * 60 * 1000;
 
 let config = {
   version: "V32 POLISHED UI",
@@ -261,12 +262,24 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  await loadRoomList(false);
+  const cached = restoreRoomCache();
+  if (cached) {
+    setSheetState("캐시");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+  }
+
+  await Promise.allSettled([loadNotices(false), refreshPublicConfig(false)]);
+
+  if (cached) {
+    refreshRoomListRemote(false).catch(() => {});
+  } else {
+    await refreshRoomListRemote(false);
+  }
+
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
-
-  // 공지는 첫 화면 표시를 막지 않고 뒤에서 불러옵니다.
-  setTimeout(() => loadNotices(false).catch(() => {}), 0);
 }
 
 async function refreshPublicConfig(recheck = true) {
@@ -432,58 +445,122 @@ function rowsToRoom(rows) {
   return list.filter((item) => !seen.has(item.id) && seen.add(item.id));
 }
 
-async function loadRoomList(show = false) {
+function restoreRoomCache() {
+  try {
+    const raw = localStorage.getItem(ROOM_CACHE_KEY);
+    if (!raw) return false;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list) || !list.length) return false;
+    roomList = list.filter(item => item && validUsername(normalize(item.id))).map((item, index) => ({
+      no: item.no || index + 1,
+      name: item.name || "",
+      id: normalize(item.id),
+    }));
+    return roomList.length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+function saveRoomCache() {
+  try {
+    localStorage.setItem(ROOM_CACHE_KEY, JSON.stringify(roomList));
+    localStorage.setItem(ROOM_CACHE_TIME_KEY, String(Date.now()));
+  } catch (_) {}
+}
+
+function roomCacheIsFresh() {
+  const time = Number(localStorage.getItem(ROOM_CACHE_TIME_KEY) || 0);
+  return Boolean(time && Date.now() - time < ROOM_CACHE_MAX_AGE);
+}
+
+async function refreshRoomListRemote(show = false) {
   setSheetState("불러오는 중");
   let lastError = "";
 
   try {
-    // 가장 빠른 경로: Apps Script API를 한 번만 호출합니다.
     const data = await apiGet("roomList");
-    roomList = (data.members || [])
-      .map((item, index) => ({
-        no: item.no || index + 1,
-        name: item.name || "",
-        id: normalize(item.id),
-      }))
-      .filter((item) => validUsername(item.id));
+    const nextList = (data.members || []).map((item, index) => ({
+      no: item.no || index + 1,
+      name: item.name || "",
+      id: normalize(item.id),
+    })).filter((item) => validUsername(item.id));
 
-    if (!roomList.length) throw new Error("API 명단 0명");
+    if (!nextList.length) throw new Error("API 명단 0명");
 
-    followRenderLimit = 80;
+    const changed = JSON.stringify(nextList) !== JSON.stringify(roomList);
+    roomList = nextList;
+    saveRoomCache();
     setSheetState("정상");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-
+    if (changed || !$("followList").children.length) {
+      updateFollowStats();
+      renderGroupTabs();
+      renderFollowList();
+    }
     if (show) toast("명단 새로고침 완료");
-    return;
+    return true;
   } catch (error) {
     lastError = error.message;
   }
 
-  // API 실패 시에만 로컬 백업 CSV를 한 번 사용합니다.
-  try {
-    const response = await fetch(config.fallbackCsv || "room-list.csv", { cache: "force-cache" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const urls = [];
+  if (config.sheetId) {
+    const sheet = encodeURIComponent(config.sheetName || "Sheet1");
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/gviz/tq?tqx=out:csv&sheet=${sheet}&t=${Date.now()}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&sheet=${sheet}&t=${Date.now()}`);
+  }
+  urls.push(`${config.fallbackCsv || "room-list.csv"}?t=${Date.now()}`);
 
-    roomList = rowsToRoom(parseCsv(await response.text()));
-    if (!roomList.length) throw new Error("백업 명단 0명");
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const list = rowsToRoom(parseCsv(await response.text()));
+      if (!list.length) throw new Error("0명");
+      const changed = JSON.stringify(list) !== JSON.stringify(roomList);
+      roomList = list;
+      saveRoomCache();
+      setSheetState("백업");
+      if (changed || !$("followList").children.length) {
+        updateFollowStats();
+        renderGroupTabs();
+        renderFollowList();
+      }
+      if (show) toast("백업 명단으로 불러왔습니다.");
+      return true;
+    } catch (error) {
+      lastError = error.message;
+    }
+  }
 
-    followRenderLimit = 80;
-    setSheetState("백업");
-    updateFollowStats();
-    renderGroupTabs();
-    renderFollowList();
-
-    if (show) toast("백업 명단으로 불러왔습니다.");
-    return;
-  } catch (error) {
-    lastError = error.message;
+  if (roomList.length) {
+    setSheetState("캐시");
+    if (show) toast("저장된 명단을 표시합니다.");
+    return false;
   }
 
   setSheetState("오류");
   $("followState").textContent = `명단을 불러오지 못했습니다. (${lastError})`;
   if (show) toast("명단 불러오기 실패");
+  return false;
+}
+
+async function loadRoomList(show = false, force = false) {
+  const restored = roomList.length > 0 || restoreRoomCache();
+  if (restored) {
+    setSheetState("캐시");
+    updateFollowStats();
+    renderGroupTabs();
+    renderFollowList();
+  }
+
+  if (!force && restored && roomCacheIsFresh()) {
+    refreshRoomListRemote(false).catch(() => {});
+    if (show) toast("저장된 명단을 빠르게 불러왔습니다.");
+    return;
+  }
+
+  await refreshRoomListRemote(show);
 }
 
 function setSheetState(state) {
@@ -512,7 +589,6 @@ function renderGroupTabs() {
   document.querySelectorAll(".group-tab").forEach((button) => {
     button.onclick = () => {
       currentGroup = Number(button.dataset.group);
-      followRenderLimit = 80;
       renderGroupTabs();
       renderFollowList();
     };
@@ -533,9 +609,7 @@ function followFiltered() {
 }
 
 function renderFollowList() {
-  const allItems = followFiltered();
-  const items = allItems.slice(0, followRenderLimit);
-
+  const items = followFiltered();
   $("followList").innerHTML = items.length
     ? items.map((item) => `
       <div class="follow-item">
@@ -545,11 +619,6 @@ function renderFollowList() {
         <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
       </div>`).join("")
     : '<div class="empty-state">검색 결과가 없습니다.</div>';
-
-  if ($("followMoreBtn")) {
-    $("followMoreBtn").classList.toggle("hidden", allItems.length <= followRenderLimit);
-    $("followMoreBtn").textContent = `더 보기 (${Math.min(followRenderLimit, allItems.length)}/${allItems.length})`;
-  }
 }
 
 function showView(id) {
@@ -700,7 +769,6 @@ function statusLabel(status) {
 
 function showTab(tab) {
   currentTab = tab;
-  matchRenderLimit = 80;
   document.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
   renderMatchList();
 }
@@ -714,9 +782,7 @@ function matchFiltered() {
 }
 
 function renderMatchList() {
-  const allItems = matchFiltered();
-  const items = allItems.slice(0, matchRenderLimit);
-
+  const items = matchFiltered();
   $("list").innerHTML = items.length
     ? items.map((item, index) => `
       <div class="item">
@@ -729,11 +795,6 @@ function renderMatchList() {
         <a class="insta" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
       </div>`).join("")
     : '<div class="empty-state">결과가 없습니다.</div>';
-
-  if ($("matchMoreBtn")) {
-    $("matchMoreBtn").classList.toggle("hidden", allItems.length <= matchRenderLimit);
-    $("matchMoreBtn").textContent = `더 보기 (${Math.min(matchRenderLimit, allItems.length)}/${allItems.length})`;
-  }
 }
 
 async function copyCurrent() {
@@ -904,12 +965,9 @@ $("gateSubmitBtn").onclick = submitGatePassword;
 $("gatePassword").onkeydown = (event) => { if (event.key === "Enter") submitGatePassword(); };
 $("gateRetryBtn").onclick = bootstrapAuth;
 
-$("followSearch").oninput = () => {
-  followRenderLimit = 80;
-  renderFollowList();
-};
-$("refreshFollowBtn").onclick = () => loadRoomList(true);
-$("reloadRoomBtn").onclick = () => loadRoomList(true);
+$("followSearch").oninput = renderFollowList;
+$("refreshFollowBtn").onclick = () => loadRoomList(true, true);
+$("reloadRoomBtn").onclick = () => loadRoomList(true, true);
 
 $("followUnlockBtn").onclick = unlockFollow;
 $("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
@@ -922,19 +980,8 @@ $("zipFile").onchange = () => {
 };
 $("analyzeBtn").onclick = analyze;
 $("resetBtn").onclick = resetAnalysis;
-$("searchInput").oninput = () => {
-  matchRenderLimit = 80;
-  renderMatchList();
-};
+$("searchInput").oninput = renderMatchList;
 $("copyBtn").onclick = copyCurrent;
-$("followMoreBtn").onclick = () => {
-  followRenderLimit += 80;
-  renderFollowList();
-};
-$("matchMoreBtn").onclick = () => {
-  matchRenderLimit += 80;
-  renderMatchList();
-};
 document.querySelectorAll(".tab").forEach((button) => {
   button.onclick = () => showTab(button.dataset.tab);
 });
@@ -944,7 +991,7 @@ $("adminPassword").onkeydown = (event) => { if (event.key === "Enter") adminLogi
 $("adminLogoutBtn").onclick = adminLogout;
 $("openSheetBtn").onclick = () => window.open(sheetUrl(), "_blank");
 $("adminRefreshBtn").onclick = async () => {
-  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true), loadNotices(false), loadAdminLogs()]);
+  await Promise.allSettled([refreshPublicConfig(false), loadRoomList(true, true), loadNotices(false), loadAdminLogs()]);
   toast("전체 새로고침 완료");
 };
 
@@ -993,7 +1040,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=340").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=330").catch(() => {});
   }
 
   setInterval(async () => {
@@ -1004,7 +1051,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   setInterval(async () => {
     if (!document.hidden && accessGranted) {
-      await loadNotices(true).catch(() => {});
+      await Promise.allSettled([loadNotices(true), loadRoomList(false, false)]);
     }
-  }, 120000);
+  }, 60000);
 });
