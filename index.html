@@ -10,10 +10,10 @@
   <title>여우방 팔로우리스트+맞팔확인</title>
 
   <link rel="canonical" href="https://dustns09060-eng.github.io/ys/" />
-  <link rel="manifest" href="manifest.json?v=360" />
-  <link rel="icon" href="favicon-v20.png?v=360" type="image/png" />
-  <link rel="apple-touch-icon" href="icon-192-v20.png?v=360" />
-  <link rel="stylesheet" href="style.css?v=360" />
+  <link rel="manifest" href="manifest.json?v=370" />
+  <link rel="icon" href="favicon-v20.png?v=370" type="image/png" />
+  <link rel="apple-touch-icon" href="icon-192-v20.png?v=370" />
+  <link rel="stylesheet" href="style.css?v=370" />
 
   <meta property="og:locale" content="ko_KR" />
   <meta property="og:type" content="website" />
@@ -21,8 +21,8 @@
   <meta property="og:title" content="여우방 팔로우리스트+맞팔확인" />
   <meta property="og:description" content="여우방 팔로우리스트와 맞팔확인을 한 번에 확인해요." />
   <meta property="og:url" content="https://dustns09060-eng.github.io/ys/" />
-  <meta property="og:image" content="https://dustns09060-eng.github.io/ys/preview-v35.png?v=360" />
-  <meta property="og:image:secure_url" content="https://dustns09060-eng.github.io/ys/preview-v35.png?v=360" />
+  <meta property="og:image" content="https://dustns09060-eng.github.io/ys/preview-v35.png?v=370" />
+  <meta property="og:image:secure_url" content="https://dustns09060-eng.github.io/ys/preview-v35.png?v=370" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -30,12 +30,12 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="여우방 팔로우리스트+맞팔확인" />
   <meta name="twitter:description" content="여우방 팔로우리스트와 맞팔확인을 한 번에 확인해요." />
-  <meta name="twitter:image" content="https://dustns09060-eng.github.io/ys/preview-v35.png?v=360" />
+  <meta name="twitter:image" content="https://dustns09060-eng.github.io/ys/preview-v35.png?v=370" />
 </head>
 <body>
   <div id="appGate" class="gate-overlay">
     <section class="gate-card access-card">
-      <img src="app-logo-v20.png?v=360" alt="여우방 로고" class="gate-logo" />
+      <img src="app-logo-v20.png?v=370" alt="여우방 로고" class="gate-logo" />
       <h1 id="gateTitle">여우방</h1>
       <p id="gateMessage" class="hidden"></p>
 
@@ -63,7 +63,7 @@
 
   <div id="updateOverlay" class="gate-overlay hidden">
     <section class="gate-card">
-      <img src="app-logo-v20.png?v=360" alt="여우방 로고" class="gate-logo" />
+      <img src="app-logo-v20.png?v=370" alt="여우방 로고" class="gate-logo" />
       <h1>새 버전이 있습니다</h1>
       <p id="updateMessage">앱을 최신 버전으로 업데이트해 주세요.</p>
       <button id="updateNowBtn" class="primary" type="button">지금 업데이트</button>
@@ -72,7 +72,7 @@
 
   <header class="header">
     <div class="brand">
-      <img class="brand-logo" src="app-logo-v20.png?v=360" alt="여우방 로고" />
+      <img class="brand-logo" src="app-logo-v20.png?v=370" alt="여우방 로고" />
       <div class="brand-text">
         <h1>여우방</h1>
         <p class="hidden">팔로우리스트+맞팔확인</p>
@@ -114,6 +114,25 @@
             <article><span>▦</span><strong id="groupTotal">0조</strong></article>
           </div>
           <span id="lastRefresh" class="hidden">대기</span>
+
+          <section id="resumeCard" class="resume-card hidden" aria-live="polite">
+            <div class="resume-card-head">
+              <div>
+                <strong>📍 이어보기</strong>
+                <p id="resumeTime" class="resume-time"></p>
+              </div>
+              <span id="todayVisitCount" class="resume-count">오늘 0명</span>
+            </div>
+            <div class="resume-person">
+              <span id="resumeLocation">마지막 위치 없음</span>
+              <strong id="resumeName"></strong>
+              <small id="resumeId"></small>
+            </div>
+            <div class="resume-actions">
+              <button id="resumeBtn" class="primary resume-primary" type="button">이어보기</button>
+              <button id="resumeResetBtn" class="outline" type="button">초기화</button>
+            </div>
+          </section>
 
           <div class="follow-tools-sticky">
             <div class="search-wrap standalone">
@@ -308,7 +327,7 @@
 
   <footer>
     <span>© 2026 YEOWOOBANG</span>
-    <span>Version 36.0</span>
+    <span>Version 37.0</span>
   </footer>
 
   <nav class="bottom-nav" aria-label="주요 메뉴">
@@ -328,6 +347,6 @@
 
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="app.js?v=360"></script>
+  <script src="app.js?v=370"></script>
 </body>
 </html>

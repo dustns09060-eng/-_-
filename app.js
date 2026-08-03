@@ -16,16 +16,178 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V36";
+const APP_VERSION = "V37";
 
 let config = {
-  version: "V36 SPRINT 1",
+  version: "V37 RESUME",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
   sheetName: "팔로우리스트",
   fallbackCsv: "room-list.csv",
 };
+
+const FOLLOW_PROGRESS_KEY = "yeowoobang:lastFollowPosition:v1";
+const FOLLOW_DAILY_KEY = "yeowoobang:dailyFollowVisits:v1";
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function readStorageJson(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function writeStorageJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function formatResumeTime(timestamp) {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const today = localDateKey();
+  const target = localDateKey(date);
+  const time = date.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  if (target === today) return `오늘 ${time}`;
+
+  return `${date.toLocaleDateString("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+  })} ${time}`;
+}
+
+function getDailyVisitData() {
+  const today = localDateKey();
+  const saved = readStorageJson(FOLLOW_DAILY_KEY, null);
+
+  if (!saved || saved.date !== today || !Array.isArray(saved.ids)) {
+    return { date: today, ids: [] };
+  }
+
+  return saved;
+}
+
+function recordDailyVisit(id) {
+  const daily = getDailyVisitData();
+  if (!daily.ids.includes(id)) daily.ids.push(id);
+  writeStorageJson(FOLLOW_DAILY_KEY, daily);
+  renderResumeCard();
+}
+
+function saveLastFollowPosition(item) {
+  const index = roomList.findIndex((person) => person.id === item.id);
+  const group = index >= 0 ? Math.floor(index / 500) + 1 : Math.max(currentGroup, 1);
+
+  const data = {
+    group,
+    no: String(item.no || ""),
+    name: String(item.name || ""),
+    id: String(item.id || ""),
+    timestamp: Date.now(),
+  };
+
+  if (writeStorageJson(FOLLOW_PROGRESS_KEY, data)) {
+    recordDailyVisit(data.id);
+    renderResumeCard();
+  }
+}
+
+function getLastFollowPosition() {
+  const saved = readStorageJson(FOLLOW_PROGRESS_KEY, null);
+  if (!saved || !validUsername(normalize(saved.id))) return null;
+  return {
+    ...saved,
+    id: normalize(saved.id),
+    group: Math.max(1, Number(saved.group) || 1),
+  };
+}
+
+function renderResumeCard() {
+  const card = $("resumeCard");
+  if (!card) return;
+
+  const last = getLastFollowPosition();
+  const daily = getDailyVisitData();
+
+  $("todayVisitCount").textContent = `오늘 ${daily.ids.length}명`;
+
+  if (!last) {
+    card.classList.add("hidden");
+    return;
+  }
+
+  $("resumeLocation").textContent = `${last.group}조 · ${last.no}번`;
+  $("resumeName").textContent = last.name || "닉네임 없음";
+  $("resumeId").textContent = `@${last.id}`;
+  $("resumeTime").textContent = formatResumeTime(last.timestamp);
+  card.classList.remove("hidden");
+}
+
+function clearLastFollowPosition() {
+  try {
+    localStorage.removeItem(FOLLOW_PROGRESS_KEY);
+  } catch (_) {}
+
+  renderResumeCard();
+  toast("이어보기 기록을 초기화했습니다.");
+}
+
+function highlightFollowItem(id) {
+  const target = document.querySelector(
+    `.follow-item[data-follow-id="${CSS.escape(id)}"]`
+  );
+
+  if (!target) return false;
+
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  target.classList.add("resume-highlight");
+
+  setTimeout(() => {
+    target.classList.remove("resume-highlight");
+  }, 2600);
+
+  return true;
+}
+
+function resumeLastFollowPosition() {
+  const last = getLastFollowPosition();
+  if (!last) {
+    toast("저장된 이어보기 기록이 없습니다.");
+    return;
+  }
+
+  $("followSearch").value = "";
+  currentGroup = last.group;
+  renderGroupTabs();
+  renderFollowList();
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!highlightFollowItem(last.id)) {
+        toast("명단에서 마지막 위치를 찾지 못했습니다.");
+      }
+    });
+  });
+}
 
 function toast(message) {
   const el = $("toast");
@@ -452,6 +614,7 @@ async function loadRoomList(show = false) {
     updateFollowStats();
     renderGroupTabs();
     renderFollowList();
+    renderResumeCard();
     if (show) toast("명단 새로고침 완료");
     return;
   } catch (error) {
@@ -477,6 +640,7 @@ async function loadRoomList(show = false) {
       updateFollowStats();
       renderGroupTabs();
       renderFollowList();
+      renderResumeCard();
       if (show) toast("백업 명단으로 불러왔습니다.");
       return;
     } catch (error) {
@@ -593,11 +757,11 @@ function renderFollowList() {
   const items = followFiltered();
   $("followList").innerHTML = items.length
     ? items.map((item) => `
-      <div class="follow-item">
+      <div class="follow-item" data-follow-id="${escapeHtml(item.id)}">
         <span class="follow-no">${escapeHtml(item.no)}</span>
         <span class="follow-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
         <a class="follow-id" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" title="@${escapeHtml(item.id)}">@${escapeHtml(item.id)}</a>
-        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" aria-label="인스타그램 열기">↗ 열기</a>
+        <a class="insta-btn" href="https://www.instagram.com/${encodeURIComponent(item.id)}/" target="_blank" rel="noopener" data-save-follow="${escapeHtml(item.id)}" aria-label="인스타그램 열기">↗ 열기</a>
       </div>`).join("")
     : '<div class="empty-state">검색 결과가 없습니다.</div>';
 }
@@ -1015,6 +1179,18 @@ $("followSearch").oninput = renderFollowList;
 $("refreshFollowBtn").onclick = () => loadRoomList(true);
 $("reloadRoomBtn").onclick = () => loadMatchRoomList(true, true);
 
+$("resumeBtn").onclick = resumeLastFollowPosition;
+$("resumeResetBtn").onclick = clearLastFollowPosition;
+
+$("followList").addEventListener("click", (event) => {
+  const link = event.target.closest("[data-save-follow]");
+  if (!link) return;
+
+  const id = normalize(link.dataset.saveFollow);
+  const item = roomList.find((person) => person.id === id);
+  if (item) saveLastFollowPosition(item);
+});
+
 $("followUnlockBtn").onclick = unlockFollow;
 $("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
 
@@ -1083,11 +1259,12 @@ $("installBtn").onclick = async () => {
 };
 
 window.addEventListener("DOMContentLoaded", async () => {
+  renderResumeCard();
   await loadConfig();
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=360").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=370").catch(() => {});
   }
 
   setInterval(async () => {

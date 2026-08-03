@@ -499,3 +499,82 @@ body.gate-open{overflow:hidden}
     padding:14px;
   }
 }
+
+/* V37 개인 이어보기 */
+.resume-card{
+  margin:14px 0 18px;
+  padding:16px;
+  border:1px solid #ffd2b3;
+  border-radius:17px;
+  background:linear-gradient(145deg,#fffaf6 0%,#fff5ed 100%);
+  box-shadow:0 8px 22px rgba(255,101,0,.08);
+}
+.resume-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.resume-card-head strong{
+  display:block;
+  font-size:17px;
+}
+.resume-time{
+  margin:4px 0 0;
+  color:var(--muted);
+  font-size:12px;
+}
+.resume-count{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid #ffd9bf;
+  color:#d95400;
+  font-size:12px;
+}
+.resume-person{
+  display:grid;
+  gap:4px;
+  margin:14px 0;
+  padding:13px 14px;
+  border-radius:14px;
+  background:rgba(255,255,255,.82);
+}
+.resume-person span{
+  color:#d95400;
+  font-size:13px;
+}
+.resume-person strong{
+  font-size:18px;
+}
+.resume-person small{
+  color:var(--muted);
+  font-size:14px;
+}
+.resume-actions{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:9px;
+}
+.resume-primary{
+  padding:12px 14px;
+  font-size:15px;
+}
+.follow-item.resume-highlight{
+  position:relative;
+  z-index:1;
+  border-radius:12px;
+  background:#fff2ad;
+  box-shadow:0 0 0 3px rgba(255,182,0,.25);
+  animation:resumePulse .75s ease-in-out 2;
+}
+@keyframes resumePulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.008)}
+}
+@media(max-width:520px){
+  .resume-actions{grid-template-columns:1fr 1fr}
+  .resume-actions .outline{width:100%}
+}
+
