@@ -5,6 +5,7 @@ let matchRoomList = [];
 let result = { all: [], mutual: [], onlyMe: [], fansOnly: [], neither: [] };
 let currentTab = "all";
 let currentGroup = 0;
+let currentCopyBatch = 0;
 let installPrompt = null;
 let adminLoggedIn = false;
 let adminPasswordValue = "";
@@ -16,10 +17,10 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V37";
+const APP_VERSION = "V38";
 
 let config = {
-  version: "V37 RESUME",
+  version: "V38 COPY40",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -177,7 +178,9 @@ function resumeLastFollowPosition() {
 
   $("followSearch").value = "";
   currentGroup = last.group;
+  currentCopyBatch = 0;
   renderGroupTabs();
+  renderCopyBatches();
   renderFollowList();
 
   requestAnimationFrame(() => {
@@ -613,6 +616,7 @@ async function loadRoomList(show = false) {
     setSheetState("정상");
     updateFollowStats();
     renderGroupTabs();
+    renderCopyBatches();
     renderFollowList();
     renderResumeCard();
     if (show) toast("명단 새로고침 완료");
@@ -639,6 +643,7 @@ async function loadRoomList(show = false) {
       setSheetState("백업");
       updateFollowStats();
       renderGroupTabs();
+      renderCopyBatches();
       renderFollowList();
       renderResumeCard();
       if (show) toast("백업 명단으로 불러왔습니다.");
@@ -725,6 +730,99 @@ function updateFollowStats() {
   $("followState").textContent = `전체 ${roomList.length}명 · 500명씩 ${groups}개 조`;
 }
 
+
+const FOLLOW_COPY_BATCH_SIZE = 40;
+
+function currentFollowGroupItems() {
+  if (currentGroup > 0) {
+    return roomList.slice((currentGroup - 1) * 500, currentGroup * 500);
+  }
+  return roomList;
+}
+
+function renderCopyBatches() {
+  const card = $("copyBatchCard");
+  const container = $("copyBatchButtons");
+  if (!card || !container) return;
+
+  const items = currentFollowGroupItems();
+  const totalBatches = Math.ceil(items.length / FOLLOW_COPY_BATCH_SIZE);
+
+  $("copyBatchGroup").textContent = currentGroup > 0 ? `${currentGroup}조` : "전체";
+
+  if (!items.length || !totalBatches) {
+    card.classList.add("hidden");
+    container.innerHTML = "";
+    return;
+  }
+
+  if (currentCopyBatch >= totalBatches) currentCopyBatch = 0;
+
+  container.innerHTML = Array.from({ length: totalBatches }, (_, batchIndex) => {
+    const startIndex = batchIndex * FOLLOW_COPY_BATCH_SIZE;
+    const endIndex = Math.min(startIndex + FOLLOW_COPY_BATCH_SIZE, items.length);
+    const first = items[startIndex];
+    const last = items[endIndex - 1];
+
+    const startLabel = first?.no || startIndex + 1;
+    const endLabel = last?.no || endIndex;
+    const isNext = batchIndex === currentCopyBatch;
+
+    return `
+      <button
+        class="copy-batch-btn ${isNext ? "next" : ""}"
+        type="button"
+        data-copy-batch="${batchIndex}"
+        aria-label="${escapeHtml(startLabel)}번부터 ${escapeHtml(endLabel)}번까지 복사"
+      >
+        <span>${escapeHtml(startLabel)}~${escapeHtml(endLabel)}</span>
+        <small>${endIndex - startIndex}명</small>
+      </button>
+    `;
+  }).join("");
+
+  $("copyBatchGuide").textContent =
+    currentGroup > 0
+      ? `${currentGroup}조 명단을 40명 단위로 복사합니다.`
+      : "전체 명단을 40명 단위로 복사합니다.";
+
+  card.classList.remove("hidden");
+
+  requestAnimationFrame(() => {
+    container.querySelector(".copy-batch-btn.next")?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  });
+}
+
+async function copyFollowBatch(batchIndex) {
+  const items = currentFollowGroupItems();
+  const start = batchIndex * FOLLOW_COPY_BATCH_SIZE;
+  const batch = items.slice(start, start + FOLLOW_COPY_BATCH_SIZE);
+
+  if (!batch.length) {
+    toast("복사할 명단이 없습니다.");
+    return;
+  }
+
+  try {
+    await writeClipboardText(batch.map((item) => `@${item.id}`).join("\n"));
+
+    const totalBatches = Math.ceil(items.length / FOLLOW_COPY_BATCH_SIZE);
+    currentCopyBatch = batchIndex + 1 < totalBatches ? batchIndex + 1 : 0;
+
+    const firstNo = batch[0]?.no || start + 1;
+    const lastNo = batch[batch.length - 1]?.no || start + batch.length;
+
+    renderCopyBatches();
+    toast(`${firstNo}~${lastNo} · ${batch.length}명 복사 완료`);
+  } catch (error) {
+    toast(error.message || "40명 복사 실패");
+  }
+}
+
 function renderGroupTabs() {
   const total = Math.max(1, Math.ceil(roomList.length / 500));
   $("groupTabs").innerHTML = ["전체", ...Array.from({ length: total }, (_, i) => `${i + 1}조`)]
@@ -734,7 +832,9 @@ function renderGroupTabs() {
   document.querySelectorAll(".group-tab").forEach((button) => {
     button.onclick = () => {
       currentGroup = Number(button.dataset.group);
+      currentCopyBatch = 0;
       renderGroupTabs();
+      renderCopyBatches();
       renderFollowList();
     };
   });
@@ -1191,6 +1291,16 @@ $("followList").addEventListener("click", (event) => {
   if (item) saveLastFollowPosition(item);
 });
 
+$("copyBatchButtons").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-copy-batch]");
+  if (!button) return;
+
+  const batchIndex = Number(button.dataset.copyBatch);
+  if (Number.isInteger(batchIndex) && batchIndex >= 0) {
+    copyFollowBatch(batchIndex);
+  }
+});
+
 $("followUnlockBtn").onclick = unlockFollow;
 $("followPassword").onkeydown = (event) => { if (event.key === "Enter") unlockFollow(); };
 
@@ -1264,7 +1374,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=370").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=380").catch(() => {});
   }
 
   setInterval(async () => {

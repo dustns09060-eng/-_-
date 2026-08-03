@@ -578,3 +578,101 @@ body.gate-open{overflow:hidden}
   .resume-actions .outline{width:100%}
 }
 
+/* V38 팔로우리스트 40명씩 복사 */
+.copy-batch-card{
+  margin:10px 0 16px;
+  padding:15px;
+  border:1px solid #dfe3e8;
+  border-radius:17px;
+  background:#fafbfc;
+}
+.copy-batch-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.copy-batch-head strong{
+  display:block;
+  font-size:16px;
+}
+.copy-batch-head p{
+  margin:4px 0 0;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.45;
+}
+.copy-batch-group{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  border:1px solid #ffd1ae;
+  background:#fff7f1;
+  color:#d95400;
+  font-size:12px;
+}
+.copy-batch-buttons{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding:2px 1px 7px;
+  scroll-snap-type:x proximity;
+  scrollbar-width:thin;
+}
+.copy-batch-btn{
+  flex:0 0 auto;
+  min-width:92px;
+  min-height:54px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  border:1px solid #d9dde3;
+  border-radius:13px;
+  background:#fff;
+  color:var(--text);
+  font:inherit;
+  font-weight:900;
+  cursor:pointer;
+  scroll-snap-align:start;
+}
+.copy-batch-btn span{
+  font-size:14px;
+  white-space:nowrap;
+}
+.copy-batch-btn small{
+  color:var(--muted);
+  font-size:11px;
+}
+.copy-batch-btn.next{
+  border-color:var(--orange);
+  background:#fff4ec;
+  color:#d95400;
+  box-shadow:0 0 0 2px rgba(255,101,0,.08);
+}
+.copy-batch-btn.next small{
+  color:#d95400;
+}
+.copy-batch-btn:active{
+  transform:scale(.97);
+}
+@media(max-width:520px){
+  .copy-batch-card{
+    margin-left:-2px;
+    margin-right:-2px;
+    padding:13px;
+  }
+  .copy-batch-head{
+    align-items:center;
+  }
+  .copy-batch-head p{
+    max-width:220px;
+  }
+  .copy-batch-btn{
+    min-width:86px;
+    min-height:52px;
+  }
+}
+
