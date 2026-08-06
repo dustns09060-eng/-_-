@@ -676,3 +676,9 @@ body.gate-open{overflow:hidden}
   }
 }
 
+
+
+/* V40 빠른 로딩 */
+#followState{
+  min-height:20px;
+}

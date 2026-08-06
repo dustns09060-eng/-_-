@@ -17,10 +17,10 @@ let followGranted = false;
 let gateMode = "loading";
 let securityVersion = "";
 let noticeSignature = "";
-const APP_VERSION = "V38";
+const APP_VERSION = "V40";
 
 let config = {
-  version: "V38 COPY40",
+  version: "V40 FASTLOAD",
   appName: "여우방 팔로우리스트+맞팔확인",
   apiUrl: "",
   sheetId: "",
@@ -30,6 +30,10 @@ let config = {
 
 const FOLLOW_PROGRESS_KEY = "yeowoobang:lastFollowPosition:v1";
 const FOLLOW_DAILY_KEY = "yeowoobang:dailyFollowVisits:v1";
+const FOLLOW_LIST_CACHE_KEY = "yeowoobang:followListCache:v1";
+const FOLLOW_LIST_CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 7;
+const JSZIP_CDN_URL = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+let jsZipLoadPromise = null;
 
 function localDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -237,6 +241,101 @@ function unique(values) {
   return [...set];
 }
 
+
+function saveFollowListCache(list) {
+  if (!Array.isArray(list) || !list.length) return;
+
+  writeStorageJson(FOLLOW_LIST_CACHE_KEY, {
+    savedAt: Date.now(),
+    members: list.map((item) => ({
+      no: item.no,
+      name: item.name,
+      id: item.id,
+    })),
+  });
+}
+
+function restoreFollowListCache() {
+  const cached = readStorageJson(FOLLOW_LIST_CACHE_KEY, null);
+  if (!cached || !Array.isArray(cached.members) || !cached.members.length) {
+    return false;
+  }
+
+  const age = Date.now() - Number(cached.savedAt || 0);
+  if (!Number.isFinite(age) || age > FOLLOW_LIST_CACHE_MAX_AGE) {
+    return false;
+  }
+
+  const restored = cached.members
+    .map((item, index) => ({
+      no: item.no || index + 1,
+      name: String(item.name || ""),
+      id: normalize(item.id),
+    }))
+    .filter((item) => validUsername(item.id));
+
+  if (!restored.length) return false;
+
+  roomList = restored;
+  updateFollowStats();
+  renderGroupTabs();
+  renderCopyBatches();
+  renderFollowList();
+  renderResumeCard();
+
+  if ($("followState")) {
+    $("followState").textContent =
+      `저장된 명단 ${roomList.length}명을 먼저 표시했습니다. 최신 명단 확인 중...`;
+  }
+
+  return true;
+}
+
+function scheduleNoticeLoad(delay = 2000) {
+  window.setTimeout(() => {
+    if (accessGranted) {
+      loadNotices(false).catch(() => {});
+    }
+  }, delay);
+}
+
+function loadJsZipLibrary() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  if (jsZipLoadPromise) return jsZipLoadPromise;
+
+  jsZipLoadPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-jszip-lazy="true"]');
+
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.JSZip), { once: true });
+      existing.addEventListener("error", () => reject(new Error("ZIP 분석 라이브러리를 불러오지 못했습니다.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = JSZIP_CDN_URL;
+    script.async = true;
+    script.dataset.jszipLazy = "true";
+
+    script.onload = () => {
+      if (window.JSZip) {
+        resolve(window.JSZip);
+      } else {
+        reject(new Error("ZIP 분석 라이브러리를 불러오지 못했습니다."));
+      }
+    };
+
+    script.onerror = () => {
+      jsZipLoadPromise = null;
+      reject(new Error("ZIP 분석 라이브러리를 불러오지 못했습니다."));
+    };
+
+    document.head.appendChild(script);
+  });
+
+  return jsZipLoadPromise;
+}
+
 async function loadConfig() {
   try {
     const response = await fetch(`config.json?t=${Date.now()}`, { cache: "no-store" });
@@ -425,11 +524,16 @@ async function submitGatePassword() {
 }
 
 async function loadAfterAuth() {
-  await Promise.allSettled([
+  restoreFollowListCache();
+
+  const essentialTasks = [
     loadRoomList(false),
-    loadNotices(false),
     refreshPublicConfig(false),
-  ]);
+  ];
+
+  scheduleNoticeLoad(2000);
+
+  await Promise.allSettled(essentialTasks);
   securityVersion = publicConfig?.securityVersion || "";
   checkVersionUpdate();
 }
@@ -619,6 +723,7 @@ async function loadRoomList(show = false) {
     renderCopyBatches();
     renderFollowList();
     renderResumeCard();
+    saveFollowListCache(roomList);
     if (show) toast("명단 새로고침 완료");
     return;
   } catch (error) {
@@ -646,6 +751,7 @@ async function loadRoomList(show = false) {
       renderCopyBatches();
       renderFollowList();
       renderResumeCard();
+      saveFollowListCache(roomList);
       if (show) toast("백업 명단으로 불러왔습니다.");
       return;
     } catch (error) {
@@ -808,11 +914,7 @@ async function copyFollowBatch(batchIndex) {
   }
 
   try {
-    const copyText = batch
-  .map(item => `${item.no}. ${item.name} @${item.id}`)
-  .join("\n");
-
-await writeClipboardText(copyText);
+    await writeClipboardText(batch.map((item) => `@${item.id}`).join("\n"));
 
     const totalBatches = Math.ceil(items.length / FOLLOW_COPY_BATCH_SIZE);
     currentCopyBatch = batchIndex + 1 < totalBatches ? batchIndex + 1 : 0;
@@ -932,9 +1034,9 @@ function extractJson(text) {
 
 async function parseInstagramZip(file) {
   if (!file) throw new Error("ZIP 파일을 선택해 주세요.");
-  if (!window.JSZip) throw new Error("ZIP 분석 라이브러리를 불러오지 못했습니다.");
 
-  const zip = await JSZip.loadAsync(file);
+  const JSZipLibrary = await loadJsZipLibrary();
+  const zip = await JSZipLibrary.loadAsync(file);
   const paths = findFiles(zip);
 
   if (!paths.followers.length) throw new Error("followers_1 파일을 찾지 못했습니다.");
@@ -984,8 +1086,9 @@ async function analyze() {
   const button = $("analyzeBtn");
   try {
     button.disabled = true;
-    button.textContent = "분석 중...";
+    button.textContent = window.JSZip ? "분석 중..." : "분석 준비 중...";
     if (!matchRoomList.length) await loadMatchRoomList(false);
+    button.textContent = "분석 중...";
     const parsed = await parseInstagramZip($("zipFile").files[0]);
     classify(parsed.followers, parsed.following, matchRoomList);
     updateSummary();
@@ -1378,7 +1481,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await bootstrapAuth();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js?v=380").catch(() => {});
+    navigator.serviceWorker.register("sw.js?v=400").catch(() => {});
   }
 
   setInterval(async () => {
