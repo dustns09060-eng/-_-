@@ -920,7 +920,7 @@ async function copyFollowBatch(batchIndex) {
           const no = String(item.no || start + index + 1).trim();
           const name = String(item.name || "").trim();
           const id = String(item.id || "").trim();
-          return `${no}\t${name}\t@${id}`;
+          return `${no}. ${name} @${id}`;
         })
         .join("\n")
     );
