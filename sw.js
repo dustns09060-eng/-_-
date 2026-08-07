@@ -1,16 +1,16 @@
-const CACHE = 'yeowoobang-v35-1-static-352';
+const CACHE = 'yeowoobang-copy-number-v401';
 const ASSETS = [
   './',
   './index.html',
-  './style.css?v=352',
-  './app.js?v=352',
-  './config.json?v=352',
-  './manifest.json?v=352',
-  './favicon-v20.png?v=352',
-  './icon-192-v20.png?v=352',
-  './icon-512-v20.png?v=352',
-  './app-logo-v20.png?v=352',
-  './preview-v35.png?v=352'
+  './style.css?v=401',
+  './app.js?v=401',
+  './config.json?v=401',
+  './manifest.json?v=401',
+  './favicon-v20.png?v=401',
+  './icon-192-v20.png?v=401',
+  './icon-512-v20.png?v=401',
+  './app-logo-v20.png?v=401',
+  './preview-v35.png?v=401'
 ];
 
 self.addEventListener('install', (event) => {

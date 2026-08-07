@@ -914,7 +914,16 @@ async function copyFollowBatch(batchIndex) {
   }
 
   try {
-    await writeClipboardText(batch.map((item) => `@${item.id}`).join("\n"));
+    await writeClipboardText(
+      batch
+        .map((item, index) => {
+          const no = String(item.no || start + index + 1).trim();
+          const name = String(item.name || "").trim();
+          const id = String(item.id || "").trim();
+          return `${no}\t${name}\t@${id}`;
+        })
+        .join("\n")
+    );
 
     const totalBatches = Math.ceil(items.length / FOLLOW_COPY_BATCH_SIZE);
     currentCopyBatch = batchIndex + 1 < totalBatches ? batchIndex + 1 : 0;
